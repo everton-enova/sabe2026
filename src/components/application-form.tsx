@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
+import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
 
 type Mode = "cp" | "sm";
@@ -71,6 +72,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [details, setDetails] = useState<Details>(emptyDetails);
   const [action, setAction] = useState<"validar" | "alterar" | "cadastrar">(isCp ? "validar" : "cadastrar");
   const [accepted, setAccepted] = useState(false);
+  const [bankChoice, setBankChoice] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingCandidate, setLoadingCandidate] = useState(false);
   const [message, setMessage] = useState("");
@@ -131,6 +133,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       conta: "",
       pix: "",
     });
+    setBankChoice("");
     setStage("form");
   }
 
@@ -181,6 +184,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setStage("selection");
     setPlace("");
     setDetails(emptyDetails);
+    setBankChoice("");
     setCoordinator(undefined);
     setAccepted(false);
     setMessage("");
@@ -243,7 +247,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
             </div></fieldset>
             <fieldset><legend>Dados bancários</legend><p className="field-help">A conta deve estar no nome do responsável informado acima.</p><div className="field-grid">
-              <label>Banco<input name="banco" value={details.banco} onChange={(event) => setDetails({ ...details, banco: event.target.value })} placeholder="Nome ou código do banco" required /></label>
+              <label>Banco<select name="bancoLista" value={bankChoice} onChange={(event) => { const value = event.target.value; setBankChoice(value); setDetails({ ...details, banco: value === "__outro__" ? "" : value }); }} required><option value="">Selecione o banco</option>{banks.map((bank) => { const value = `${bank.codigo} - ${bank.nome}`; return <option value={value} key={`${bank.codigo}-${bank.nome}`}>{value}</option>; })}<option value="__outro__">OUTROS — Digitar banco</option></select></label>
+              {bankChoice === "__outro__" && <label>Qual banco?<input name="banco" value={details.banco} onChange={(event) => setDetails({ ...details, banco: event.target.value })} placeholder="Digite o nome do banco" autoComplete="organization" required /></label>}
               <label>Agência<input name="agencia" inputMode="numeric" value={details.agencia} onChange={(event) => setDetails({ ...details, agencia: event.target.value })} required /></label>
               <label>Conta corrente<input name="conta" value={details.conta} onChange={(event) => setDetails({ ...details, conta: event.target.value })} required /></label>
               <label>Chave Pix<input name="pix" value={details.pix} onChange={(event) => setDetails({ ...details, pix: event.target.value })} placeholder="CPF, e-mail, telefone ou aleatória" required /></label>

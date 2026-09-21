@@ -1,0 +1,542 @@
+[
+  {
+    "codigo": "654",
+    "nome": "A.J. RENNER S.A."
+  },
+  {
+    "codigo": "246",
+    "nome": "ABC-BRASIL S.A."
+  },
+  {
+    "codigo": "213",
+    "nome": "ARBI S.A."
+  },
+  {
+    "codigo": "019",
+    "nome": "AZTECA DO BRASIL S.A."
+  },
+  {
+    "codigo": "025",
+    "nome": "BANCO ALFA"
+  },
+  {
+    "codigo": "241",
+    "nome": "Banco Classico S.A"
+  },
+  {
+    "codigo": "083",
+    "nome": "BANCO DA CHINA BRASIL S.A."
+  },
+  {
+    "codigo": "300",
+    "nome": "BANCO DE LA NACION ARGENTINA"
+  },
+  {
+    "codigo": "495",
+    "nome": "BANCO DE LA PROVINCIA DE BUENOS AIRES"
+  },
+  {
+    "codigo": "494",
+    "nome": "BANCO DE LA REPUBLICA ORIENTAL DEL URUGUAY"
+  },
+  {
+    "codigo": "001",
+    "nome": "BANCO DO BRASIL"
+  },
+  {
+    "codigo": "037",
+    "nome": "BANCO DO ESTADO DO PARÁ S.A"
+  },
+  {
+    "codigo": "456",
+    "nome": "BANCO TOKYO MITSUBISH UFJ BRASIL S.A"
+  },
+  {
+    "codigo": "370",
+    "nome": "BANCO WESTLB DO BRASIL"
+  },
+  {
+    "codigo": "756",
+    "nome": "BANCOOB"
+  },
+  {
+    "codigo": "047",
+    "nome": "BANESE"
+  },
+  {
+    "codigo": "033",
+    "nome": "BANESPA"
+  },
+  {
+    "codigo": "021",
+    "nome": "BANESTES"
+  },
+  {
+    "codigo": "719",
+    "nome": "BANIF-BANCO INTERNACIONAL DO FUNCHAL (BRASIL) S.A"
+  },
+  {
+    "codigo": "755",
+    "nome": "BANK OF AMERICA MERRILL LYNCH BANCO MULTIPLO S.A."
+  },
+  {
+    "codigo": "041",
+    "nome": "BANRISUL"
+  },
+  {
+    "codigo": "740",
+    "nome": "BARCLAYS S.A."
+  },
+  {
+    "codigo": "003",
+    "nome": "BASA"
+  },
+  {
+    "codigo": "107",
+    "nome": "BBM S.A"
+  },
+  {
+    "codigo": "081",
+    "nome": "BBN BANCO BRASILEIRO DE NEGOCIOS S.A"
+  },
+  {
+    "codigo": "250",
+    "nome": "BCV - BANCO DE CREDITO E VAREJO S.A"
+  },
+  {
+    "codigo": "036",
+    "nome": "BEM"
+  },
+  {
+    "codigo": "122",
+    "nome": "BERJ S.A"
+  },
+  {
+    "codigo": "078",
+    "nome": "BES INVESTIMENTO DO BRASIL SA - BANCO DE INVESTIM."
+  },
+  {
+    "codigo": "739",
+    "nome": "BGN S.A."
+  },
+  {
+    "codigo": "320",
+    "nome": "BIC BANCO"
+  },
+  {
+    "codigo": "096",
+    "nome": "BM&F DE SERV. DE LIQUIDACAO E CUSTODIA S.A"
+  },
+  {
+    "codigo": "394",
+    "nome": "BMC S.A."
+  },
+  {
+    "codigo": "318",
+    "nome": "BMG S.A."
+  },
+  {
+    "codigo": "004",
+    "nome": "BNB"
+  },
+  {
+    "codigo": "752",
+    "nome": "BNP PARIBAS BRASIL S.A"
+  },
+  {
+    "codigo": "017",
+    "nome": "BNY MELLON S.A."
+  },
+  {
+    "codigo": "248",
+    "nome": "BOA VISTA INTERATLANTICO S.A"
+  },
+  {
+    "codigo": "218",
+    "nome": "BONSUCESSO S.A."
+  },
+  {
+    "codigo": "069",
+    "nome": "BPN BRASIL BANCO MULTIPLO S.A"
+  },
+  {
+    "codigo": "065",
+    "nome": "BRACCE S.A."
+  },
+  {
+    "codigo": "237",
+    "nome": "BRADESCO"
+  },
+  {
+    "codigo": "225",
+    "nome": "BRASCAN S.A."
+  },
+  {
+    "codigo": "125",
+    "nome": "BRASIL PLURAL S.A. BANCO MULTIPLO"
+  },
+  {
+    "codigo": "070",
+    "nome": "BRB"
+  },
+  {
+    "codigo": "092",
+    "nome": "BRICKELL S A CREDITO, FINANCIAMENTO E INVESTIMENTO"
+  },
+  {
+    "codigo": "208",
+    "nome": "BTG PACTUAL S.A."
+  },
+  {
+    "codigo": "263",
+    "nome": "CACIQUE S.A."
+  },
+  {
+    "codigo": "104",
+    "nome": "CAIXA ECON. FEDERAL"
+  },
+  {
+    "codigo": "473",
+    "nome": "CAIXA GERAL - BRASIL S.A."
+  },
+  {
+    "codigo": "412",
+    "nome": "CAPITAL S.A."
+  },
+  {
+    "codigo": "040",
+    "nome": "CARGILL S.A"
+  },
+  {
+    "codigo": "112",
+    "nome": "CC UNICRED BRASIL CENTRAL"
+  },
+  {
+    "codigo": "084",
+    "nome": "CC UNIPRIME NORTE DO PARANA"
+  },
+  {
+    "codigo": "114",
+    "nome": "CECOOPES-CENTRAL DAS COOP DE ECON E CRED MUTUO DO"
+  },
+  {
+    "codigo": "085",
+    "nome": "CECREDI"
+  },
+  {
+    "codigo": "266",
+    "nome": "CEDULA S.A."
+  },
+  {
+    "codigo": "233",
+    "nome": "CIFRA S.A."
+  },
+  {
+    "codigo": "745",
+    "nome": "CITIBANK"
+  },
+  {
+    "codigo": "477",
+    "nome": "Citibank N.A."
+  },
+  {
+    "codigo": "090",
+    "nome": "COOPERATIVA CENTRAL DE CREDITO DO ESTADO DE SP"
+  },
+  {
+    "codigo": "097",
+    "nome": "COOPERATIVA CENTRAL DE CREDITO NOROESTE BRASILEIRO"
+  },
+  {
+    "codigo": "089",
+    "nome": "COOPERATIVA DE CREDITO RURAL DA REGIAO DA MOGIANA"
+  },
+  {
+    "codigo": "075",
+    "nome": "CR2 S.A"
+  },
+  {
+    "codigo": "098",
+    "nome": "CREDIALIANCA COOPERATIVA DE CREDITO RURAL"
+  },
+  {
+    "codigo": "222",
+    "nome": "CREDIT AGRICOLE BRASIL S.A."
+  },
+  {
+    "codigo": "505",
+    "nome": "CREDIT SUISSE (BRASIL) S.A."
+  },
+  {
+    "codigo": "707",
+    "nome": "DAYCOVAL"
+  },
+  {
+    "codigo": "487",
+    "nome": "DEUTSCHE BANK S. A. - BANCO ALEMAO"
+  },
+  {
+    "codigo": "214",
+    "nome": "DIBENS S.A."
+  },
+  {
+    "codigo": "265",
+    "nome": "FATOR S.A."
+  },
+  {
+    "codigo": "224",
+    "nome": "FIBRA"
+  },
+  {
+    "codigo": "626",
+    "nome": "FICSA S.A."
+  },
+  {
+    "codigo": "121",
+    "nome": "GERADOR S.A."
+  },
+  {
+    "codigo": "612",
+    "nome": "GUANABARA S.A."
+  },
+  {
+    "codigo": "062",
+    "nome": "HIPERCARD BANCO MULTIPLO S.A"
+  },
+  {
+    "codigo": "399",
+    "nome": "HSBC"
+  },
+  {
+    "codigo": "063",
+    "nome": "IBI"
+  },
+  {
+    "codigo": "604",
+    "nome": "INDUSTRIAL DO BRASIL S. A."
+  },
+  {
+    "codigo": "653",
+    "nome": "INDUSVAL S.A."
+  },
+  {
+    "codigo": "492",
+    "nome": "ING BANK N.V."
+  },
+  {
+    "codigo": "630",
+    "nome": "INTERCAP S.A."
+  },
+  {
+    "codigo": "077",
+    "nome": "INTERMEDIUM S.A."
+  },
+  {
+    "codigo": "249",
+    "nome": "Investcred Unibanco"
+  },
+  {
+    "codigo": "652",
+    "nome": "ITAU HOLDING FINANCEIRA S.A"
+  },
+  {
+    "codigo": "341",
+    "nome": "ITAÚ"
+  },
+  {
+    "codigo": "184",
+    "nome": "Itaú-BBA"
+  },
+  {
+    "codigo": "074",
+    "nome": "J. SAFRA S.A."
+  },
+  {
+    "codigo": "376",
+    "nome": "J.P. MORGAN S.A."
+  },
+  {
+    "codigo": "217",
+    "nome": "JOHN DEERE S.A."
+  },
+  {
+    "codigo": "488",
+    "nome": "JPMORGAN CHASE BANK"
+  },
+  {
+    "codigo": "076",
+    "nome": "KDB DO BRASIL S.A"
+  },
+  {
+    "codigo": "757",
+    "nome": "KEB DO BRASIL S.A."
+  },
+  {
+    "codigo": "600",
+    "nome": "Luso Brasileiro"
+  },
+  {
+    "codigo": "243",
+    "nome": "MAXIMA S.A."
+  },
+  {
+    "codigo": "389",
+    "nome": "MERCANTIL DO BRASIL"
+  },
+  {
+    "codigo": "746",
+    "nome": "MODAL S.A."
+  },
+  {
+    "codigo": "066",
+    "nome": "MORGAN STANLEY DEAN WITTER S.A"
+  },
+  {
+    "codigo": "014",
+    "nome": "NATIXIS BRASIL S.A. - BANCO MòLTIPLO"
+  },
+  {
+    "codigo": "753",
+    "nome": "NBC BANK BRASIL S.A.- BANCO MULTIPLO"
+  },
+  {
+    "codigo": "045",
+    "nome": "OPPORTUNITY S.A."
+  },
+  {
+    "codigo": "079",
+    "nome": "ORIGINAL DO AGRONEGOCIO S.A."
+  },
+  {
+    "codigo": "212",
+    "nome": "ORIGINAL S.A."
+  },
+  {
+    "codigo": "623",
+    "nome": "PANAMERICANO"
+  },
+  {
+    "codigo": "254",
+    "nome": "PARANA BANCO S.A."
+  },
+  {
+    "codigo": "611",
+    "nome": "PAULISTA"
+  },
+  {
+    "codigo": "613",
+    "nome": "PECUNIA S.A."
+  },
+  {
+    "codigo": "094",
+    "nome": "PETRA S.A."
+  },
+  {
+    "codigo": "643",
+    "nome": "PINE S.A."
+  },
+  {
+    "codigo": "735",
+    "nome": "POTTENCIAL S.A."
+  },
+  {
+    "codigo": "747",
+    "nome": "RABOBANK INTERNATIONAL BRASIL S.A."
+  },
+  {
+    "codigo": "088",
+    "nome": "RANDON S.A."
+  },
+  {
+    "codigo": "633",
+    "nome": "RENDIMENTO S.A."
+  },
+  {
+    "codigo": "741",
+    "nome": "RIBEIRÃO PRETO"
+  },
+  {
+    "codigo": "120",
+    "nome": "RODOBENS S.A"
+  },
+  {
+    "codigo": "453",
+    "nome": "RURAL"
+  },
+  {
+    "codigo": "072",
+    "nome": "RURAL MAIS S.A"
+  },
+  {
+    "codigo": "422",
+    "nome": "SAFRA"
+  },
+  {
+    "codigo": "751",
+    "nome": "SCOTIABANK BRASIL S.A BANCO MULTIPLO"
+  },
+  {
+    "codigo": "743",
+    "nome": "SEMEAR S.A."
+  },
+  {
+    "codigo": "748",
+    "nome": "SICREDI"
+  },
+  {
+    "codigo": "749",
+    "nome": "SIMPLES S.A."
+  },
+  {
+    "codigo": "366",
+    "nome": "SOCIETE GENERALE BRASIL S.A"
+  },
+  {
+    "codigo": "637",
+    "nome": "SOFISA S.A."
+  },
+  {
+    "codigo": "464",
+    "nome": "SUMITOMO MITSUI BRASILEIRO S.A."
+  },
+  {
+    "codigo": "082",
+    "nome": "TOPAZIO S.A."
+  },
+  {
+    "codigo": "634",
+    "nome": "Triangulo"
+  },
+  {
+    "codigo": "230",
+    "nome": "UNICARD BANCO MULTIPLO S.A"
+  },
+  {
+    "codigo": "091",
+    "nome": "UNICRED CENTRAL RS - CENTRAL DE COOP ECON CRED MUT"
+  },
+  {
+    "codigo": "087",
+    "nome": "UNICRED CENTRAL SANTA CATARINA"
+  },
+  {
+    "codigo": "099",
+    "nome": "UNIPRIME CENTRAL - CENTRAL INT DE COOP DE CRED LTD"
+  },
+  {
+    "codigo": "655",
+    "nome": "VOTORANTIM"
+  },
+  {
+    "codigo": "610",
+    "nome": "VR S.A."
+  },
+  {
+    "codigo": "119",
+    "nome": "WESTERN UNION DO BRASIL S.A."
+  },
+  {
+    "codigo": "124",
+    "nome": "WOORI BANK DO BRASIL S.A"
+  }
+]
