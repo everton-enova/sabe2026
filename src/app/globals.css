@@ -1,0 +1,27 @@
+:root { color-scheme: light; --bg:#f6f8fa; --surface:#fff; --text:#14212b; --muted:#596873; --line:#d4dee5; --blue:#075da8; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { min-height:100vh; background:var(--bg); color:var(--text); font:16px/1.55 Inter,system-ui,sans-serif; }
+a { color:inherit; text-decoration:none; }
+a:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+header { background:var(--surface); border-bottom:1px solid var(--line); }
+nav { width:min(1100px,calc(100% - 32px)); min-height:72px; margin:auto; display:flex; align-items:center; justify-content:space-between; }
+nav div { display:flex; gap:24px; color:var(--muted); font-size:.875rem; font-weight:600; }
+.brand { font-weight:750; letter-spacing:-.03em; }.brand span,.eyebrow { color:var(--blue); }
+main { width:min(1100px,calc(100% - 32px)); margin:auto; padding:clamp(56px,8vw,104px) 0 80px; }
+.hero { display:grid; grid-template-columns:1.4fr .6fr; gap:24px 72px; align-items:end; padding-bottom:72px; border-bottom:1px solid #9eacb7; }
+.eyebrow { grid-column:1/-1; font-size:.75rem; font-weight:750; letter-spacing:.1em; text-transform:uppercase; }
+h1 { font-size:clamp(3rem,8vw,6rem); line-height:.95; letter-spacing:-.055em; text-wrap:balance; }
+.hero>p:last-child { color:var(--muted); font-size:1.08rem; max-width:42ch; }
+h2 { margin:28px 0 16px 64px; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; }
+.application-list { border-bottom:1px solid var(--line); }
+.application-list>a { min-height:128px; display:grid; grid-template-columns:48px 1fr 24px; gap:16px; align-items:center; border-top:1px solid var(--line); transition:background-color .15s; }
+.application-list>a:hover { background:#e7f2fb; color:var(--blue); }
+.number { color:var(--muted); font-size:.8rem; font-variant-numeric:tabular-nums; }
+.application-list strong { display:block; font-size:clamp(1.35rem,3vw,2rem); letter-spacing:-.025em; }
+.application-list small { display:block; margin-top:6px; color:var(--muted); font-size:1rem; }
+.application-page { display:grid; grid-template-columns:1fr 320px; gap:80px; }
+.application-page h1 { margin:12px 0 24px; font-size:clamp(2.8rem,7vw,5rem); }
+.application-page .lead { max-width:58ch; color:var(--muted); font-size:1.15rem; }
+.status { border-top:3px solid var(--blue); padding-top:18px; }
+.status h2 { margin:0 0 12px; }.status p { color:var(--muted); }
+@media(max-width:700px){ nav div a:first-child{display:none}.hero,.application-page{grid-template-columns:1fr}.hero{gap:20px;padding-bottom:48px}.application-page{gap:48px}h2{margin-left:0} }
