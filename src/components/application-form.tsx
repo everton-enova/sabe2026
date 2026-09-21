@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import Link from "next/link";
 import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
 
@@ -73,6 +72,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [action, setAction] = useState<"validar" | "alterar" | "cadastrar">(isCp ? "validar" : "cadastrar");
   const [accepted, setAccepted] = useState(false);
   const [bankChoice, setBankChoice] = useState("");
+  const [bankSearch, setBankSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingCandidate, setLoadingCandidate] = useState(false);
   const [message, setMessage] = useState("");
@@ -88,6 +88,12 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       (isCp ? data.coordinators.filter((item) => item.nte === nte).map((item) => item.polo) : data.locations.filter((item) => item.nte === nte).map((item) => item.municipio)),
     );
   }, [isCp, nte]);
+
+  const matchingBanks = useMemo(() => {
+    const query = bankSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!query || bankChoice) return [];
+    return banks.filter((bank) => `${bank.codigo} - ${bank.nome}`.toLocaleLowerCase("pt-BR").includes(query)).slice(0, 12);
+  }, [bankChoice, bankSearch]);
 
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
 
@@ -134,12 +140,17 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       pix: "",
     });
     setBankChoice("");
+    setBankSearch("");
     setStage("form");
   }
 
   function reviewForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    if (!bankChoice || (bankChoice === "__outro__" && !details.banco.trim())) {
+      setMessage("Selecione um banco da lista ou use a opção para digitar outro banco.");
+      return;
+    }
     if (!validCpf(details.cpf)) {
       setMessage("Confira o CPF informado. Ele precisa ser válido.");
       return;
@@ -185,6 +196,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setPlace("");
     setDetails(emptyDetails);
     setBankChoice("");
+    setBankSearch("");
     setCoordinator(undefined);
     setAccepted(false);
     setMessage("");
@@ -193,7 +205,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   return (
     <main className="form-page">
       <section className="form-intro">
-        <Link className="back-link" href="/">← Voltar para aplicações</Link>
         <p className="eyebrow">Aplicação {mode.toUpperCase()}</p>
         <h1>{isCp ? "Coordenador de Polo" : "Supervisor Municipal"}</h1>
         <p className="lead">
@@ -232,7 +243,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar polo</button></div>
             <dl className="candidate-data"><div><dt>Nome indicado</dt><dd>{coordinator.nome}</dd></div><div><dt>CPF</dt><dd>{coordinator.cpf}</dd></div></dl>
             <p className="notice"><strong>Atenção:</strong> ao validar, você confirma os dados da pessoa indicada. Para informar outra pessoa ou corrigir os dados, escolha alterar.</p>
-            <div className="form-actions split"><button className="button secondary" type="button" onClick={openEditForm}>Alterar dados</button><button className="button primary" type="button" onClick={() => { setAction("validar"); setStage("review"); }}>Validar indicação <span>→</span></button></div>
+            <div className="form-actions split"><button className="button secondary" type="button" onClick={resetSelection}>Voltar</button><div className="action-group"><button className="button secondary" type="button" onClick={openEditForm}>Alterar dados</button><button className="button primary" type="button" onClick={() => { setAction("validar"); setStage("review"); }}>Validar indicação <span>→</span></button></div></div>
           </div>
         )}
 
@@ -247,14 +258,17 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
             </div></fieldset>
             <fieldset><legend>Dados bancários</legend><p className="field-help">A conta deve estar no nome do responsável informado acima.</p><div className="field-grid">
-              <label>Banco<select name="bancoLista" value={bankChoice} onChange={(event) => { const value = event.target.value; setBankChoice(value); setDetails({ ...details, banco: value === "__outro__" ? "" : value }); }} required><option value="">Selecione o banco</option>{banks.map((bank) => { const value = `${bank.codigo} - ${bank.nome}`; return <option value={value} key={`${bank.codigo}-${bank.nome}`}>{value}</option>; })}<option value="__outro__">OUTROS — Digitar banco</option></select></label>
-              {bankChoice === "__outro__" && <label>Qual banco?<input name="banco" value={details.banco} onChange={(event) => setDetails({ ...details, banco: event.target.value })} placeholder="Digite o nome do banco" autoComplete="organization" required /></label>}
+              {bankChoice === "__outro__" ? (
+                <label>Banco não encontrado<input name="banco" value={details.banco} onChange={(event) => setDetails({ ...details, banco: event.target.value })} placeholder="Digite o nome ou número do banco" autoComplete="organization" required /><button className="bank-other" type="button" onClick={() => { setBankChoice(""); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Voltar para a lista de bancos</button></label>
+              ) : (
+                <label className="bank-search-field">Banco<input name="bancoBusca" value={bankChoice || bankSearch} onChange={(event) => { const value = event.target.value; setBankChoice(""); setBankSearch(value); setDetails({ ...details, banco: "" }); }} placeholder="Digite o nome ou código do banco" autoComplete="off" required />{matchingBanks.length > 0 && <div className="bank-options" role="listbox" aria-label="Bancos encontrados">{matchingBanks.map((bank) => { const value = `${bank.codigo} - ${bank.nome}`; return <button type="button" role="option" aria-selected="false" key={value} onClick={() => { setBankSearch(value); setBankChoice(value); setDetails({ ...details, banco: value }); }}>{value}</button>; })}</div>}<button className="bank-other" type="button" onClick={() => { setBankChoice("__outro__"); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Não encontrou? Digitar outro banco</button></label>
+              )}
               <label>Agência<input name="agencia" inputMode="numeric" value={details.agencia} onChange={(event) => setDetails({ ...details, agencia: event.target.value })} required /></label>
               <label>Conta corrente<input name="conta" value={details.conta} onChange={(event) => setDetails({ ...details, conta: event.target.value })} required /></label>
               <label>Chave Pix<input name="pix" value={details.pix} onChange={(event) => setDetails({ ...details, pix: event.target.value })} placeholder="CPF, e-mail, telefone ou aleatória" required /></label>
             </div></fieldset>
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions split"><button className="button secondary" type="button" onClick={() => setStage(isCp ? "candidate" : "selection")}>Voltar</button><button className="button primary" type="submit">Revisar dados <span>→</span></button></div>
+            <div className="form-actions split"><button className="button secondary" type="button" onClick={resetSelection}>Voltar</button><button className="button primary" type="submit">Revisar dados <span>→</span></button></div>
           </form>
         )}
 
@@ -274,7 +288,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         )}
 
         {stage === "success" && (
-          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido. Como combinado, ele não está mais disponível para alteração.</p><Link className="button secondary" href="/">Voltar ao início</Link></div>
+          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido. Como combinado, ele não está mais disponível para alteração.</p></div>
         )}
       </section>
     </main>
