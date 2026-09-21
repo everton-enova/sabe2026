@@ -127,8 +127,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     }
   }
 
-  function openEditForm() {
-    setAction("alterar");
+  function openForm(newAction: "validar" | "alterar") {
+    setAction(newAction);
     setDetails({
       nome: coordinator?.nome ?? "",
       email: "",
@@ -205,7 +205,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   return (
     <main className="form-page">
       <section className="form-intro">
-        <p className="eyebrow">Aplicação {mode.toUpperCase()}</p>
         <h1>{isCp ? "Coordenador de Polo" : "Supervisor Municipal"}</h1>
         <p className="lead">
           {isCp
@@ -243,7 +242,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar polo</button></div>
             <dl className="candidate-data"><div><dt>Nome indicado</dt><dd>{coordinator.nome}</dd></div><div><dt>CPF</dt><dd>{coordinator.cpf}</dd></div></dl>
             <p className="notice"><strong>Atenção:</strong> ao validar, você confirma os dados da pessoa indicada. Para informar outra pessoa ou corrigir os dados, escolha alterar.</p>
-            <div className="form-actions split"><button className="button secondary" type="button" onClick={resetSelection}>Voltar</button><div className="action-group"><button className="button secondary" type="button" onClick={openEditForm}>Alterar dados</button><button className="button primary" type="button" onClick={() => { setAction("validar"); setStage("review"); }}>Validar indicação <span>→</span></button></div></div>
+            <div className="form-actions split"><button className="button secondary" type="button" onClick={resetSelection}>Voltar</button><div className="action-group"><button className="button secondary" type="button" onClick={() => openForm("alterar")}>Alterar dados</button><button className="button primary" type="button" onClick={() => openForm("validar")}>Validar indicação <span>→</span></button></div></div>
           </div>
         )}
 
@@ -252,10 +251,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="section-heading"><span>02</span><div><h2>Dados do responsável</h2><p>Preencha todos os campos. Eles não poderão ser alterados após o envio.</p></div></div>
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar {placeLabel.toLowerCase()}</button></div>
             <fieldset><legend>Dados pessoais</legend><div className="field-grid">
-              <label className="wide">Nome completo<input name="nome" autoComplete="name" value={details.nome} onChange={(event) => setDetails({ ...details, nome: event.target.value })} required /></label>
+              <label className="wide">Nome completo<input name="nome" autoComplete="name" value={details.nome} onChange={(event) => setDetails({ ...details, nome: event.target.value })} required readOnly={isCp && action === "validar"} /></label>
               <label>E-mail<input name="email" type="email" autoComplete="email" value={details.email} onChange={(event) => setDetails({ ...details, email: event.target.value })} required /></label>
               <label>Telefone<input name="telefone" type="tel" inputMode="tel" autoComplete="tel" value={details.telefone} onChange={(event) => setDetails({ ...details, telefone: formatPhone(event.target.value) })} placeholder="(71) 99999-9999" required /></label>
-              <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
+              <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required readOnly={isCp && action === "validar"} /></label>
             </div></fieldset>
             <fieldset><legend>Dados bancários</legend><p className="field-help">A conta deve estar no nome do responsável informado acima.</p><div className="field-grid">
               {bankChoice === "__outro__" ? (
@@ -276,11 +275,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           <div>
             <div className="section-heading"><span>03</span><div><h2>Revise antes de enviar</h2><p>Depois da confirmação, este formulário ficará indisponível para alterações.</p></div></div>
             <div className="review-block"><h3>Localização</h3><dl><div><dt>NTE</dt><dd>{nte}</dd></div><div><dt>{placeLabel}</dt><dd>{place}</dd></div></dl></div>
-            {isCp && action === "validar" ? (
-              <div className="review-block"><h3>Indicação validada</h3><dl><div><dt>Nome</dt><dd>{coordinator?.nome}</dd></div><div><dt>CPF</dt><dd>{coordinator?.cpf}</dd></div></dl></div>
-            ) : (
-              <div className="review-block"><h3>Responsável</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{{ nome: "Nome", email: "E-mail", telefone: "Telefone", cpf: "CPF", banco: "Banco", agencia: "Agência", conta: "Conta corrente", pix: "Chave Pix" }[key as keyof Details]}</dt><dd>{value}</dd></div>)}</dl></div>
-            )}
+            <div className="review-block"><h3>{isCp && action === "validar" ? "Indicação validada" : "Responsável"}</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{{ nome: "Nome", email: "E-mail", telefone: "Telefone", cpf: "CPF", banco: "Banco", agencia: "Agência", conta: "Conta corrente", pix: "Chave Pix" }[key as keyof Details]}</dt><dd>{value}</dd></div>)}</dl></div>
             <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio.</span></label>
             {message && <p className="form-message error" role="alert">{message}</p>}
             <div className="form-actions split"><button className="button secondary" type="button" onClick={() => setStage(isCp && action === "validar" ? "candidate" : "form")}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
