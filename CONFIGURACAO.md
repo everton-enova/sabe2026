@@ -9,7 +9,7 @@
 5. Crie a propriedade `SABE_WEBHOOK_SECRET` e informe um segredo forte.
 6. Clique em **Implantar → Nova implantação**.
 7. Escolha **Aplicativo da Web**.
-8. Configure **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**.
+8. Configure **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**. A planilha em si deve permanecer restrita à equipe; remova o compartilhamento público e não use mais o endpoint público de visualização.
 9. Autorize o acesso solicitado e copie a URL final terminada em `/exec`.
 
 Para gerar um segredo no terminal:
@@ -28,8 +28,16 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 | --- | --- |
 | `SABE_SHEETS_WEBHOOK_URL` | URL `/exec` copiada do Apps Script |
 | `SABE_WEBHOOK_SECRET` | Mesmo segredo salvo nas propriedades do Apps Script |
+| `SABE_CP_ACCESS_CODE` | Código institucional com pelo menos 16 caracteres |
+| `SABE_APP_ORIGIN` | URL pública exata da aplicação, incluindo `https://` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Site key do Cloudflare Turnstile |
+| `TURNSTILE_SECRET_KEY` | Secret key do Cloudflare Turnstile |
+| `UPSTASH_REDIS_REST_URL` | URL REST do Redis Upstash para rate limit compartilhado |
+| `UPSTASH_REDIS_REST_TOKEN` | Token REST do Redis Upstash |
 
 Marque os ambientes **Production**, **Preview** e **Development**. Depois abra **Deployments**, localize o último deploy e use **Redeploy** para que as variáveis entrem em vigor.
+
+O Turnstile precisa ser configurado para as origens de produção e preview usadas pela aplicação. O Redis REST é obrigatório em produção para que o limite de requisições seja compartilhado entre as funções serverless.
 
 ## 3. Teste final
 
@@ -41,7 +49,7 @@ Marque os ambientes **Production**, **Preview** e **Development**. Depois abra *
 ## O que funciona sem variáveis
 
 - Seleção de NTE, polo e município.
-- Consulta de nome e CPF do CP.
+- Consulta autenticada dos dados do CP, com leitura otimizada e sem fallback público.
 - Formulários, validações e revisão.
 
-As variáveis são necessárias para gravar os envios na planilha e aplicar o bloqueio definitivo no servidor.
+As variáveis de planilha, acesso institucional, Turnstile e Redis são necessárias para liberar a operação em produção.
