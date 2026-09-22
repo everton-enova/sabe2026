@@ -3,11 +3,11 @@
 import { FormEvent, useMemo, useRef, useState } from "react";
 import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
-
 import { Coordinator, Details, detailLabels, emptyDetails } from "@/lib/cp";
 
 type Mode = "cp" | "sm";
 type Stage = "selection" | "candidate" | "conference" | "form" | "review" | "success";
+
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
 function formatCpf(value: string) {
@@ -60,24 +60,31 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   const ntes = useMemo(
     () => unique((isCp ? data.coordinators : data.locations).map((item) => item.nte)),
-    [isCp],
+    [isCp]
   );
 
   const places = useMemo(() => {
     if (!nte) return [];
     return unique(
-      (isCp ? data.coordinators.filter((item) => item.nte === nte).map((item) => item.polo) : data.locations.filter((item) => item.nte === nte).map((item) => item.municipio)),
+      (isCp ? data.coordinators.filter((item) => item.nte === nte).map((item) => item.polo) : data.locations.filter((item) => item.nte === nte).map((item) => item.municipio))
     );
   }, [isCp, nte]);
 
   const matchingBanks = useMemo(() => {
     const query = bankSearch.trim().toLocaleLowerCase("pt-BR");
     if (!query || bankChoice) return [];
-    return banks.filter((bank) => `${bank.codigo} - ${bank.nome}`.toLocaleLowerCase("pt-BR").includes(query)).slice(0, 12);
-  }, [bankChoice, bankSearch]);
+    
+    // Se for Poupança, filtra APENAS a Caixa Econômica Federal
+    const banksToSearch = details.tipoConta === "Poupança"
+      ? banks.filter(b => b.codigo === "104" || b.nome.toLocaleLowerCase("pt-BR").includes("caixa"))
+      : banks;
+
+    return banksToSearch
+      .filter((bank) => `${bank.codigo} - ${bank.nome}`.toLocaleLowerCase("pt-BR").includes(query))
+      .slice(0, 12);
+  }, [bankChoice, bankSearch, details.tipoConta]);
 
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
-
   const placeLabel = isCp ? "Polo" : "Município";
   const stageNumber = stage === "selection" ? 1 : stage === "candidate" || stage === "conference" || stage === "form" ? 2 : 3;
 
@@ -176,14 +183,16 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           local: place,
           ...details,
           ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
-          // As colunas extras da planilha saíram das telas, mas continuam sendo enviadas como
-          // vieram: o Apps Script exige que "editar" repita adicionais igual ao registro atual,
-          // e a coluna DADOS ADICIONAIS da aba de saída segue preenchida como antes.
           ...(action === "editar" ? { adicionais: additional } : {}),
         }),
       });
-      const result = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(result.message || "Não foi possível concluir o envio.");
+      const result = (await response.json()) as { message?: string; code?: string };
+      if (!response.ok) {
+        if (result.code === "DUPLICATE") {
+          throw new Error("Este NTE e Polo/Município já possui um registro validado. Alterações só podem ser feitas manualmente na planilha.");
+        }
+        throw new Error(result.message || "Não foi possível concluir o envio.");
+      }
       window.localStorage.setItem(`sabe2026:${mode}:${nte}:${place}`, new Date().toISOString());
       setStage("success");
     } catch (error) {
@@ -209,46 +218,34 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   return (
     <main className="form-page">
-                  <section className="form-intro">
-  <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
-  <div className="intro-copy">
-    {isCp ? (
-      <>
-        <p className="lead">Prezado(a) Diretor(a),</p>
-        <p>
-          Este formulário tem como objetivo validar os dados dos Coordenadores de Polo que
-          atuarão nas aplicações do SABE 2026, nas sedes de polo dos municípios pertencentes
-          aos seus respectivos Núcleos Territoriais de Educação (NTE).
-        </p>
-        <p><strong>Para realizar o preenchimento:</strong></p>
-        <ol>
-          <li>Selecione o seu NTE.</li>
-          <li>Selecione o município.</li>
-          <li>
-            Confira os dados apresentados dos Coordenadores de Polo que atuaram no SABE 2025 e
-            verifique se permanecem para o SABE 2026.
-          </li>
-          <li>Caso as informações estejam corretas, realize a validação.</li>
-          <li>
-            Caso seja necessária a substituição do Coordenador de Polo, selecione a opção
-            “Alterar Coordenador de Polo” e informe os dados da nova pessoa indicada.
-          </li>
-        </ol>
-        <p><strong>Confira todas as informações antes de concluir o formulário.</strong></p>
-      </>
-    ) : (
-      <p className="lead">
-        Selecione o NTE e o município antes de informar os dados do supervisor responsável.
-      </p>
-    )}
-  </div>
-</section>
+      <section className="form-intro">
+        <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
+        <div className="intro-copy">
+          {isCp ? (
+            <>
+              <p className="lead">Prezado(a) Diretor(a),</p>
+              <p>Este formulário tem como objetivo validar os dados dos Coordenadores de Polo que atuarão nas aplicações do SABE 2026, nas sedes de polo dos municípios pertencentes aos seus respectivos Núcleos Territoriais de Educação (NTE).</p>
+              <p><strong>Para realizar o preenchimento:</strong></p>
+              <ol>
+                <li>Selecione o seu NTE.</li>
+                <li>Selecione o município.</li>
+                <li>Confira os dados apresentados dos Coordenadores de Polo que atuaram no SABE 2025 e verifique se permanecem para o SABE 2026.</li>
+                <li>Caso as informações estejam corretas, realize a validação.</li>
+                <li>Caso seja necessária a substituição do Coordenador de Polo, selecione a opção “Alterar Coordenador de Polo” e informe os dados da nova pessoa indicada.</li>
+              </ol>
+              <p><strong>Confira todas as informações antes de concluir o formulário.</strong></p>
+            </>
+          ) : (
+            <p className="lead">Selecione o NTE e o município antes de informar os dados do supervisor responsável.</p>
+          )}
+        </div>
+      </section>
 
       {stage !== "success" && (
         <ol className="steps" aria-label="Etapas do formulário">
           {["Localização", isCp ? "Validação" : "Dados", "Revisão"].map((label, index) => (
             <li className={stageNumber >= index + 1 ? "active" : ""} key={label} aria-current={stageNumber === index + 1 ? "step" : undefined}>
-              <span>{index + 1}</span>{label}
+              <span>{index + 1}</span> {label}
             </li>
           ))}
         </ol>
@@ -259,12 +256,22 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           <form onSubmit={selectLocation} aria-busy={loadingCandidate}>
             <div className="section-heading"><span>01</span><div><h2>Identifique o local</h2><p>As opções seguem a relação oficial da planilha SABE 2026.</p></div></div>
             <div className="field-grid">
-              <label>NTE<select disabled={loadingCandidate} value={nte} onChange={(event) => { setNte(event.target.value); setPlace(""); setMessage(""); }} required><option value="">Selecione o NTE</option>{ntes.map((item) => <option key={item}>{item}</option>)}</select></label>
-              <label>{placeLabel}<select value={place} onChange={(event) => { setPlace(event.target.value); setMessage(""); }} disabled={!nte || loadingCandidate} required><option value="">Selecione {isCp ? "o polo" : "o município"}</option>{places.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label>NTE
+                <select disabled={loadingCandidate} value={nte} onChange={(event) => { setNte(event.target.value); setPlace(""); setMessage(""); }} required>
+                  <option value="">Selecione o NTE</option>
+                  {ntes.map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </label>
+              <label>{placeLabel}
+                <select value={place} onChange={(event) => { setPlace(event.target.value); setMessage(""); }} disabled={!nte || loadingCandidate} required>
+                  <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
+                  {places.map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </label>
             </div>
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"} {!loadingCandidate && <span>→</span>}</button></div>
+            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
           </form>
         )}
 
@@ -295,24 +302,97 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           <form onSubmit={reviewForm}>
             <div className="section-heading"><span>02</span><div><h2>{isCp ? action === "alterar" ? "Indicar outro Coordenador de Polo" : "Editar Dados" : "Dados do responsável"}</h2><p>{isCp && action === "editar" ? "Corrija os dados desta indicação. O coordenador continua vinculado ao mesmo registro." : "Preencha os dados da pessoa responsável. Revise antes de enviar."}</p></div></div>
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar {placeLabel.toLowerCase()}</button></div>
+            
             <fieldset><legend>Dados pessoais</legend><div className="field-grid">
               <label className="wide">Nome completo<input name="nome" autoComplete="name" value={details.nome} onChange={(event) => setDetails({ ...details, nome: event.target.value })} required /></label>
               <label>E-mail<input name="email" type="email" autoComplete="email" value={details.email} onChange={(event) => setDetails({ ...details, email: event.target.value })} required={action !== "editar"} /></label>
               <label>Telefone<input name="telefone" type="tel" inputMode="tel" autoComplete="tel" value={details.telefone} onChange={(event) => setDetails({ ...details, telefone: formatPhone(event.target.value) })} placeholder="(71) 99999-9999" required={action !== "editar"} /></label>
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
             </div></fieldset>
-            <fieldset><legend>Dados bancários</legend><p className="field-help">A conta bancária deve estar em nome do titular indicado acima. Para contas poupança, será aceita exclusivamente a Caixa Econômica Federal. Nesse caso, confira atentamente os dados da operaçã</p><div className="field-grid">
+            
+            <fieldset><legend>Dados bancários</legend><p className="field-help">A conta deve estar no nome do responsável informado acima.</p><div className="field-grid">
+              
+              {/* NOVO CAMPO: TIPO DE CONTA */}
+              <label>Tipo de Conta
+                <select 
+                  name="tipoConta" 
+                  value={details.tipoConta || ""} 
+                  onChange={(event) => {
+                    const newTipo = event.target.value;
+                    setDetails({ 
+                      ...details, 
+                      tipoConta: newTipo, 
+                      banco: newTipo === "Poupança" ? "104 - CAIXA ECONOMICA FEDERAL" : "" 
+                    });
+                    if (newTipo === "Poupança") {
+                      setBankChoice("104 - CAIXA ECONOMICA FEDERAL");
+                      setBankSearch("104 - CAIXA ECONOMICA FEDERAL");
+                    } else {
+                      setBankChoice("");
+                      setBankSearch("");
+                    }
+                  }} 
+                  required={action !== "editar"}
+                >
+                  <option value="">Selecione o tipo de conta</option>
+                  <option value="Corrente">Conta Corrente</option>
+                  <option value="Poupança">Conta Poupança</option>
+                </select>
+              </label>
+
               {bankChoice === "__outro__" ? (
-                <label>Banco não encontrado<input name="banco" value={details.banco} onChange={(event) => setDetails({ ...details, banco: event.target.value })} placeholder="Digite o nome ou número do banco" autoComplete="organization" required={action !== "editar"} /><button className="bank-other" type="button" onClick={() => { setBankChoice(""); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Voltar para a lista de bancos</button></label>
+                <label className="wide">Banco não encontrado<input name="banco" value={details.banco} onChange={(event) => setDetails({ ...details, banco: event.target.value })} placeholder="Digite o nome ou número do banco" autoComplete="organization" required={action !== "editar"} /><button className="bank-other" type="button" onClick={() => { setBankChoice(""); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Voltar para a lista de bancos</button></label>
               ) : (
-                <label className="bank-search-field">Banco<input name="bancoBusca" value={bankChoice || bankSearch} onChange={(event) => { const value = event.target.value; setBankChoice(""); setBankSearch(value); setDetails({ ...details, banco: "" }); }} placeholder="Digite o nome ou código do banco" autoComplete="off" required={action !== "editar"} />{matchingBanks.length > 0 && <div className="bank-options" role="listbox" aria-label="Bancos encontrados">{matchingBanks.map((bank) => { const value = `${bank.codigo} - ${bank.nome}`; return <button type="button" role="option" aria-selected="false" key={value} onClick={() => { setBankSearch(value); setBankChoice(value); setDetails({ ...details, banco: value }); }}>{value}</button>; })}</div>}<button className="bank-other" type="button" onClick={() => { setBankChoice("__outro__"); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Não encontrou? Digitar outro banco</button></label>
+                <label className="bank-search-field wide">Banco
+                  <input 
+                    name="bancoBusca" 
+                    value={bankChoice || bankSearch} 
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setBankChoice("");
+                      setBankSearch(value);
+                      setDetails({ ...details, banco: "" });
+                    }} 
+                    placeholder="Digite o nome ou código do banco" 
+                    autoComplete="off" 
+                    required={action !== "editar"}
+                    // Trava o campo se for poupança para evitar digitação de outro banco
+                    readOnly={details.tipoConta === "Poupança"}
+                    style={details.tipoConta === "Poupança" ? { backgroundColor: "#f3f4f6", cursor: "not-allowed" } : {}}
+                  />
+                  {matchingBanks.length > 0 && details.tipoConta !== "Poupança" && (
+                    <div className="bank-options" role="listbox" aria-label="Bancos encontrados">
+                      {matchingBanks.map((bank) => {
+                        const value = `${bank.codigo} - ${bank.nome}`;
+                        return <button type="button" role="option" aria-selected="false" key={value} onClick={() => { setBankSearch(value); setBankChoice(value); setDetails({ ...details, banco: value }); }}>{value}</button>;
+                      })}
+                    </div>
+                  )}
+                  {details.tipoConta !== "Poupança" && (
+                    <button className="bank-other" type="button" onClick={() => { setBankChoice("__outro__"); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Não encontrou? Digitar outro banco</button>
+                  )}
+                </label>
               )}
+              
               <label>Agência<input name="agencia" inputMode="numeric" value={details.agencia} onChange={(event) => setDetails({ ...details, agencia: event.target.value })} required={action !== "editar"} /></label>
-              <label>Conta corrente<input name="conta" value={details.conta} onChange={(event) => setDetails({ ...details, conta: event.target.value })} required={action !== "editar"} /></label>
-              <label>Chave Pix<input name="pix" value={details.pix} onChange={(event) => setDetails({ ...details, pix: event.target.value })} placeholder="CPF, e-mail, telefone ou aleatória" required={action !== "editar"} /></label>
+              <label>Conta<input name="conta" value={details.conta} onChange={(event) => setDetails({ ...details, conta: event.target.value })} required={action !== "editar"} /></label>
+              
+              {/* NOVO CAMPO: VARIAÇÃO/OPERAÇÃO */}
+              <label>Variação/Operação
+                <input 
+                  name="operacao" 
+                  value={details.operacao || ""} 
+                  onChange={(event) => setDetails({ ...details, operacao: event.target.value })} 
+                  required={details.tipoConta === "Poupança" || action !== "editar"} 
+                  placeholder="Ex: 0001, 01, etc."
+                />
+              </label>
+              
+              <label className="wide">Chave Pix<input name="pix" value={details.pix} onChange={(event) => setDetails({ ...details, pix: event.target.value })} placeholder="CPF, e-mail, telefone ou aleatória" required={action !== "editar"} /></label>
             </div></fieldset>
+            
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions split"><button className="button secondary" type="button" onClick={() => { if (isCp) { if (action === "editar" && coordinator) { openForm("validar"); } else setStage("candidate"); } else resetSelection(); }}>Cancelar</button><button className="button primary" type="submit">{isCp && action === "editar" ? "Conferir correções" : "Revisar dados"} <span>→</span></button></div>
+            <div className="form-actions split"><button className="button secondary" type="button" onClick={() => { if (isCp) { if (action === "editar" && coordinator) { openForm("validar"); } else setStage("candidate"); } else resetSelection(); }}>Cancelar</button><button className="button primary" type="submit">{isCp && action === "editar" ? "Conferir correções" : "Revisar dados"}<span>→</span></button></div>
           </form>
         )}
 
@@ -328,7 +408,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         )}
 
         {stage === "success" && (
-          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido. Como combinado, ele não está mais disponível para alteração.</p></div>
+          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido. Como combinado, ele não está mais disponível para alteração neste dispositivo.</p></div>
         )}
       </section>
     </main>
