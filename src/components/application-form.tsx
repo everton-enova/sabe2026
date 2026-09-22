@@ -45,6 +45,16 @@ function normalized(value: string) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+// Função para separar dígito da agência/conta
+function extractDigito(value: string): { principal: string; digito: string } {
+  if (!value) return { principal: "", digito: "" };
+  const partes = value.split(/[-–]/);
+  if (partes.length === 2) {
+    return { principal: partes[0].trim(), digito: partes[1].trim() };
+  }
+  return { principal: value.trim(), digito: "" };
+}
+
 export function ApplicationForm({ mode }: { mode: Mode }) {
   const isCp = mode === "cp";
   const [stage, setStage] = useState<Stage>("selection");
@@ -69,7 +79,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     [isCp]
   );
 
-  // Busca polos já validados quando NTE muda
   useEffect(() => {
     async function fetchValidatedPlaces() {
       if (!nte || !isCp) {
@@ -80,8 +89,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       setLoadingValidated(true);
       try {
         const response = await fetch(`/api/validacao-status?nte=${encodeURIComponent(nte)}&mode=${mode}`);
-        const data = await response.json();
-        setValidatedPlaces(data.validated || []);
+        const result = await response.json();
+        setValidatedPlaces(result.validated || []);
       } catch (error) {
         console.error('Erro ao buscar polos validados:', error);
         setValidatedPlaces([]);
@@ -99,7 +108,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       (isCp ? data.coordinators.filter((item) => item.nte === nte).map((item) => item.polo) : data.locations.filter((item) => item.nte === nte).map((item) => item.municipio))
     );
 
-    // Retorna array com { name, isDisabled }
     return placesList.map(place => ({
       name: place,
       isDisabled: validatedPlaces.includes(normalized(place))
@@ -128,7 +136,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setMessage("");
     if (!nte || !place || busy.current) return;
 
-    // Verifica se o polo está validado
     if (validatedPlaces.includes(normalized(place))) {
       setMessage("Este polo já foi validado e não está mais disponível para alteração.");
       return;
@@ -170,9 +177,33 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   function openForm(newAction: "validar" | "alterar") {
     setAction(newAction);
+    
     const initial = newAction === "validar" && coordinator
-      ? Object.fromEntries(Object.keys(emptyDetails).map(key => [key, coordinator[key as keyof Details] || ""])) as Details
+      ? Object.fromEntries(Object.keys(emptyDetails).map(key => {
+          const valor = coordinator[key as keyof Details] || "";
+          
+          if (key === "agencia") {
+            const { principal } = extractDigito(valor);
+            return [key, principal];
+          }
+          if (key === "conta") {
+            const { principal } = extractDigito(valor);
+            return [key, principal];
+          }
+          
+          return [key, valor];
+        })) as Details
       : { ...emptyDetails };
+    
+    // Define os dígitos separadamente
+    if (coordinator && newAction === "validar") {
+      const agenciaParts = extractDigito(coordinator.agencia || "");
+      const contaParts = extractDigito(coordinator.conta || "");
+      
+      initial.agenciaDigito = agenciaParts.digito;
+      initial.contaDigito = contaParts.digito;
+    }
+    
     setDetails(initial);
     setAdditional(newAction === "validar" ? coordinator?.adicionais || [] : []);
     setBankChoice(initial.banco);
@@ -310,14 +341,18 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 </select>
               </label>
               <label>{placeLabel}
-                <select value={place} onChange={(event) => { setPlace(event.target.value); setMessage(""); }} disabled={!nte || loadingCandidate || loadingValidated} required>
+                <select 
+                  value={place} 
+                  onChange={(event) => { setPlace(event.target.value); setMessage(""); }} 
+                  disabled={!nte || loadingCandidate || loadingValidated} 
+                  required
+                >
                   <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
                   {places.map((item) => (
                     <option 
                       key={item.name} 
                       value={item.name}
                       disabled={item.isDisabled}
-                      title={item.isDisabled ? "Já validado" : ""}
                     >
                       {item.name}{item.isDisabled ? " ✓" : ""}
                     </option>
@@ -483,6 +518,17 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                     value={details.agencia} 
                     onChange={(event) => setDetails({ ...details, agencia: event.target.value })} 
                     required={action !== "editar"} 
+                    placeholder="Ex: 3529"
+                  />
+                </label>
+                <label>Dígito Agência
+                  <input 
+                    name="agenciaDigito" 
+                    inputMode="numeric" 
+                    value={details.agenciaDigito || ""} 
+                    onChange={(event) => setDetails({ ...details, agenciaDigito: event.target.value })} 
+                    placeholder="Ex: 4"
+                    maxLength={2}
                   />
                 </label>
                 <label>Conta
@@ -491,6 +537,16 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                     value={details.conta} 
                     onChange={(event) => setDetails({ ...details, conta: event.target.value })} 
                     required={action !== "editar"} 
+                    placeholder="Ex: 48678"
+                  />
+                </label>
+                <label>Dígito Conta
+                  <input 
+                    name="contaDigito" 
+                    value={details.contaDigito || ""} 
+                    onChange={(event) => setDetails({ ...details, contaDigito: event.target.value })} 
+                    placeholder="Ex: 7"
+                    maxLength={2}
                   />
                 </label>
                 
