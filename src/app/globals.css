@@ -142,3 +142,13 @@ dd { font-weight: 700; word-break: break-word; }
   .location-summary { align-items: flex-start; flex-wrap: wrap; }
   .location-summary strong { min-width: 65%; }
 }
+
+option:disabled {
+  color: #999;
+  background-color: #f5f5f5;
+  font-style: italic;
+}
+
+option:disabled::after {
+  content: " ✓";
+}

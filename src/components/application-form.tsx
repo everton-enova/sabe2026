@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useMemo, useRef, useState, useEffect } from "react";
 import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
 import { Coordinator, Details, detailLabels, emptyDetails } from "@/lib/cp";
@@ -41,6 +41,10 @@ function unique(values: string[]) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
 }
 
+function normalized(value: string) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
+}
+
 export function ApplicationForm({ mode }: { mode: Mode }) {
   const isCp = mode === "cp";
   const [stage, setStage] = useState<Stage>("selection");
@@ -53,22 +57,54 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [bankSearch, setBankSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingCandidate, setLoadingCandidate] = useState(false);
+  const [loadingValidated, setLoadingValidated] = useState(false);
   const busy = useRef(false);
   const [edited, setEdited] = useState(false);
   const [additional, setAdditional] = useState<Coordinator["adicionais"]>([]);
   const [message, setMessage] = useState("");
+  const [validatedPlaces, setValidatedPlaces] = useState<string[]>([]);
 
   const ntes = useMemo(
     () => unique((isCp ? data.coordinators : data.locations).map((item) => item.nte)),
     [isCp]
   );
 
+  // Busca polos já validados quando NTE muda
+  useEffect(() => {
+    async function fetchValidatedPlaces() {
+      if (!nte || !isCp) {
+        setValidatedPlaces([]);
+        return;
+      }
+
+      setLoadingValidated(true);
+      try {
+        const response = await fetch(`/api/validacao-status?nte=${encodeURIComponent(nte)}&mode=${mode}`);
+        const data = await response.json();
+        setValidatedPlaces(data.validated || []);
+      } catch (error) {
+        console.error('Erro ao buscar polos validados:', error);
+        setValidatedPlaces([]);
+      } finally {
+        setLoadingValidated(false);
+      }
+    }
+
+    fetchValidatedPlaces();
+  }, [nte, isCp, mode]);
+
   const places = useMemo(() => {
     if (!nte) return [];
-    return unique(
+    const placesList = unique(
       (isCp ? data.coordinators.filter((item) => item.nte === nte).map((item) => item.polo) : data.locations.filter((item) => item.nte === nte).map((item) => item.municipio))
     );
-  }, [isCp, nte]);
+
+    // Retorna array com { name, isDisabled }
+    return placesList.map(place => ({
+      name: place,
+      isDisabled: validatedPlaces.includes(normalized(place))
+    }));
+  }, [isCp, nte, validatedPlaces]);
 
   const matchingBanks = useMemo(() => {
     const query = bankSearch.trim().toLocaleLowerCase("pt-BR");
@@ -91,6 +127,13 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     event.preventDefault();
     setMessage("");
     if (!nte || !place || busy.current) return;
+
+    // Verifica se o polo está validado
+    if (validatedPlaces.includes(normalized(place))) {
+      setMessage("Este polo já foi validado e não está mais disponível para alteração.");
+      return;
+    }
+
     const locked = window.localStorage.getItem(`sabe2026:${mode}:${nte}:${place}`);
     if (locked) {
       setMessage("Este formulário já foi concluído neste dispositivo e não está mais disponível para alteração.");
@@ -105,8 +148,13 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           body: JSON.stringify({ nte, polo: place }),
           cache: "no-store", signal: AbortSignal.timeout(30000),
         });
-        const result = (await response.json()) as Coordinator & { message?: string };
-        if (!response.ok) throw new Error(result.message || "Não foi possível localizar a indicação.");
+        const result = (await response.json()) as Coordinator & { message?: string; code?: string };
+        if (!response.ok) {
+          if (result.code === 'ALREADY_VALIDATED') {
+            throw new Error("Este polo já foi validado e não está mais disponível para alteração.");
+          }
+          throw new Error(result.message || "Não foi possível localizar a indicação.");
+        }
         setCoordinator(result);
         setStage("candidate");
       } catch (error) {
@@ -230,7 +278,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <li>Selecione o município.</li>
                 <li>Confira os dados apresentados dos Coordenadores de Polo que atuaram no SABE 2025 e verifique se permanecem para o SABE 2026.</li>
                 <li>Caso as informações estejam corretas, realize a validação.</li>
-                <li>Caso seja necessária a substituição do Coordenador de Polo, selecione a opção “Alterar Coordenador de Polo” e informe os dados da nova pessoa indicada.</li>
+                <li>Caso seja necessária a substituição do Coordenador de Polo, selecione a opção "Alterar Coordenador de Polo" e informe os dados da nova pessoa indicada.</li>
               </ol>
               <p><strong>Confira todas as informações antes de concluir o formulário.</strong></p>
             </>
@@ -262,15 +310,25 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 </select>
               </label>
               <label>{placeLabel}
-                <select value={place} onChange={(event) => { setPlace(event.target.value); setMessage(""); }} disabled={!nte || loadingCandidate} required>
+                <select value={place} onChange={(event) => { setPlace(event.target.value); setMessage(""); }} disabled={!nte || loadingCandidate || loadingValidated} required>
                   <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
-                  {places.map((item) => <option key={item}>{item}</option>)}
+                  {places.map((item) => (
+                    <option 
+                      key={item.name} 
+                      value={item.name}
+                      disabled={item.isDisabled}
+                      title={item.isDisabled ? "Já validado" : ""}
+                    >
+                      {item.name}{item.isDisabled ? " ✓" : ""}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
+            {loadingValidated && <p role="status">Verificando polos já validados…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
+            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate || loadingValidated}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
           </form>
         )}
 
@@ -279,7 +337,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="section-heading"><span>02</span><div><h2>Confirme a indicação</h2><p>Verifique se a pessoa indicada continua responsável pelo polo.</p></div></div>
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar polo</button></div>
             <dl className="candidate-data"><div><dt>Nome indicado</dt><dd>{coordinator.nome}</dd></div><div><dt>CPF</dt><dd>{"•••.•••.•••-" + onlyDigits(coordinator.cpf).slice(-2)}</dd></div></dl>
-            <p className="notice"><strong>Atenção:</strong> confira os dados antes de validar. A opção “Alterar Coordenador de Polo” deve ser utilizada exclusivamente para indicar outra pessoa.</p>
+            <p className="notice"><strong>Atenção:</strong> confira os dados antes de validar. A opção "Alterar Coordenador de Polo" deve ser utilizada exclusivamente para indicar outra pessoa.</p>
             <div className="form-actions split"><button className="button secondary" type="button" onClick={resetSelection}>Voltar</button><div className="action-group"><button className="button secondary" type="button" onClick={() => openForm("alterar")}>Alterar Coordenador de Polo</button><button className="button primary" type="button" onClick={() => openForm("validar")}>Validar Indicação <span>→</span></button></div></div>
           </div>
         )}
@@ -436,7 +494,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                   />
                 </label>
                 
-                {/* CAMPO VARIAÇÃO/OPERAÇÃO: SÓ APARECE SE FOR POUPANÇA */}
                 {details.tipoConta === "Poupança" && (
                   <label>Variação/Operação
                     <input 
