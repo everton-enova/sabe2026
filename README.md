@@ -37,6 +37,6 @@ Copie `.env.example` para `.env.local` e configure `SABE_SHEETS_WEBHOOK_URL` com
 
 O arquivo `google-apps-script/Code.gs` contém o endpoint esperado. No Apps Script, defina a propriedade `SABE_WEBHOOK_SECRET`, publique como aplicativo da Web e use a URL `/exec` nas variáveis do projeto. O script rejeita GET, exige segredo, protege fórmulas inseridas, usa bloqueio concorrente e cria as abas `INSCRICOES CP` e `INSCRICOES SM` no primeiro envio.
 
-Em produção, configure Cloudflare Turnstile e Upstash Redis. A API valida origem, tamanho do corpo, limite por IP e token anti-bot antes de tocar na planilha.
+Em produção, configure apenas as variáveis da planilha descritas em `CONFIGURACAO.md`.
 
 Consulte `CONFIGURACAO.md` para o passo a passo completo da planilha e da Vercel.

@@ -5,7 +5,6 @@ import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
 
 import { Coordinator, Details, detailLabels, emptyDetails } from "@/lib/cp";
-import { BotCheck } from "@/components/bot-check";
 
 type Mode = "cp" | "sm";
 type Stage = "selection" | "candidate" | "conference" | "form" | "review" | "success";
@@ -55,8 +54,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [submitting, setSubmitting] = useState(false);
   const [loadingCandidate, setLoadingCandidate] = useState(false);
   const busy = useRef(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [challenge, setChallenge] = useState(0);
   const [edited, setEdited] = useState(false);
   const [additional, setAdditional] = useState<Coordinator["adicionais"]>([]);
   const [message, setMessage] = useState("");
@@ -99,7 +96,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       try {
         const response = await fetch("/api/indicacoes", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nte, polo: place, turnstileToken }),
+          body: JSON.stringify({ nte, polo: place }),
           cache: "no-store", signal: AbortSignal.timeout(30000),
         });
         const result = (await response.json()) as Coordinator & { message?: string };
@@ -111,8 +108,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       } finally {
         busy.current = false;
         setLoadingCandidate(false);
-        setTurnstileToken("");
-        setChallenge(value => value + 1);
       }
     } else {
       setStage("form");
@@ -181,7 +176,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           local: place,
           ...details,
           ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
-          turnstileToken,
           ...(action === "editar" ? { adicionais: additional } : {}),
         }),
       });
@@ -194,8 +188,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     } finally {
       busy.current = false;
       setSubmitting(false);
-      setTurnstileToken("");
-      setChallenge(value => value + 1);
     }
   }
 
@@ -241,10 +233,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>NTE<select disabled={loadingCandidate} value={nte} onChange={(event) => { setNte(event.target.value); setPlace(""); setMessage(""); }} required><option value="">Selecione o NTE</option>{ntes.map((item) => <option key={item}>{item}</option>)}</select></label>
               <label>{placeLabel}<select value={place} onChange={(event) => { setPlace(event.target.value); setMessage(""); }} disabled={!nte || loadingCandidate} required><option value="">Selecione {isCp ? "o polo" : "o município"}</option>{places.map((item) => <option key={item}>{item}</option>)}</select></label>
             </div>
-            {isCp && <BotCheck key={challenge} action="consulta_cp" onToken={setTurnstileToken} />}
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate || (isCp && Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) && !turnstileToken)}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"} {!loadingCandidate && <span>→</span>}</button></div>
+            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"} {!loadingCandidate && <span>→</span>}</button></div>
           </form>
         )}
 
@@ -268,7 +259,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               {additional.map((item, index) => <div key={index}><dt>{item.campo}</dt><dd>{item.valor || "Não informado"}</dd></div>)}
             </dl>
             {edited && <p role="status" className="notice">Correções preparadas. Confira os dados e valide para concluir o envio.</p>}
-            <div className="form-actions split"><button type="button" className="button secondary" onClick={() => setStage("candidate")}>Voltar</button><div className="action-group"><button type="button" className="button secondary" onClick={editCurrent}>Editar Dados</button><button type="button" className="button primary" onClick={() => { setAccepted(false); setTurnstileToken(""); setStage("review"); }}>Validar Indicação</button></div></div>
+            <div className="form-actions split"><button type="button" className="button secondary" onClick={() => setStage("candidate")}>Voltar</button><div className="action-group"><button type="button" className="button secondary" onClick={editCurrent}>Editar Dados</button><button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); }}>Validar Indicação</button></div></div>
           </div>
         )}
 
@@ -304,10 +295,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="review-block"><h3>Localização</h3><dl><div><dt>NTE</dt><dd>{nte}</dd></div><div><dt>{placeLabel}</dt><dd>{place}</dd></div></dl></div>
             <div className="review-block"><h3>{isCp && action === "validar" ? "Indicação validada" : "Responsável"}</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details]}</dt><dd>{value || "Não informado"}</dd></div>)}</dl></div>
             {isCp && action !== "alterar" && additional.length > 0 && <div className="review-block"><h3>Informações adicionais</h3><dl>{additional.map((item, index) => <div key={index}><dt>{item.campo}</dt><dd>{item.valor || "Não informado"}</dd></div>)}</dl></div>}
-            <BotCheck key={challenge} action="envio" onToken={setTurnstileToken} />
             <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio.</span></label>
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting || (Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) && !turnstileToken)} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
+            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
           </div>
         )}
 

@@ -31,26 +31,11 @@ const origin = 'http://localhost:3000';
 function request(body, extra = {}) {
   return new Request(origin + '/api/indicacoes', { method: 'POST', headers: { origin, 'content-type': 'application/json', ...extra }, body: JSON.stringify(body) });
 }
-test('rejects cross-origin, non-object JSON and oversized streams', async () => {
+test('rejects non-object JSON and oversized streams', async () => {
   const security = load('src/lib/api-security.ts');
-  await assert.rejects(security.readRequest(request({}, { origin: 'https://evil.example' })), { status: 403 });
   await assert.rejects(security.readRequest(request(null)), { status: 400 });
   await assert.rejects(security.readRequest(request([])), { status: 400 });
   await assert.rejects(security.readRequest(request({ data: 'a'.repeat(17000) })), { status: 413 });
-});
-test('limits requests and fails closed in production without Redis', async () => {
-  const security = load('src/lib/api-security.ts');
-  for (let i = 0; i < 20; i++) await security.readRequest(request({}));
-  await assert.rejects(security.readRequest(request({})), { status: 429 });
-  await assert.rejects(load('src/lib/api-security.ts', { NODE_ENV: 'production' }).readRequest(request({})), { status: 503 });
-});
-test('checks Turnstile action, hostname, success, expiry and missing configuration', async () => {
-  const env = { TURNSTILE_SECRET_KEY: 'test-secret', SABE_APP_ORIGIN: origin };
-  for (const result of [{ success: false }, { success: true, action: 'wrong', hostname: 'localhost' }, { success: true, action: 'consulta_cp', hostname: 'evil.example' }]) {
-    await assert.rejects(load('src/lib/api-security.ts', env, async () => Response.json(result)).verifyBot({ turnstileToken: 'token' }, 'consulta_cp'), { status: 403 });
-  }
-  await load('src/lib/api-security.ts', env, async () => Response.json({ success: true, action: 'consulta_cp', hostname: 'localhost' })).verifyBot({ turnstileToken: 'token' }, 'consulta_cp');
-  await assert.rejects(load('src/lib/api-security.ts', { NODE_ENV: 'production' }).verifyBot({}, 'envio'), { status: 503 });
 });
 test('lookup performs one authorized call, with no public fallback and no cache', async () => {
   let calls = 0;

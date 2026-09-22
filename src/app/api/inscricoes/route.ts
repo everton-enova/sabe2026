@@ -1,4 +1,4 @@
-import { ApiError, failure, json, readRequest, verifyBot } from "@/lib/api-security";
+import { ApiError, failure, json, readRequest } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
 
 type Submission = Record<string, unknown>;
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
     }
     // Validation uses the source record, never identity/details supplied by the browser.
     if (cp && payload.acao === "validar") for (const field of requiredDetails) delete submission[field];
-    await verifyBot(payload, "envio");
     await sheets({ ...submission, enviadoEm: new Date().toISOString() });
     return json({ ok: true });
   } catch (error) { return failure(error); }

@@ -28,15 +28,9 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 | --- | --- |
 | `SABE_SHEETS_WEBHOOK_URL` | URL `/exec` copiada do Apps Script |
 | `SABE_WEBHOOK_SECRET` | Mesmo segredo salvo nas propriedades do Apps Script |
-| `SABE_APP_ORIGIN` | URL pública exata da aplicação, incluindo `https://` |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Site key do Cloudflare Turnstile |
-| `TURNSTILE_SECRET_KEY` | Secret key do Cloudflare Turnstile |
-| `UPSTASH_REDIS_REST_URL` | URL REST do Redis Upstash para rate limit compartilhado |
-| `UPSTASH_REDIS_REST_TOKEN` | Token REST do Redis Upstash |
 
 Marque os ambientes **Production**, **Preview** e **Development**. Depois abra **Deployments**, localize o último deploy e use **Redeploy** para que as variáveis entrem em vigor.
 
-O Turnstile precisa ser configurado para as origens de produção e preview usadas pela aplicação. O Redis REST é obrigatório em produção para que o limite de requisições seja compartilhado entre as funções serverless.
 
 ## 3. Teste final
 
@@ -51,4 +45,4 @@ O Turnstile precisa ser configurado para as origens de produção e preview usad
 - Consulta autenticada dos dados do CP, com leitura otimizada e sem fallback público.
 - Formulários, validações e revisão.
 
-As variáveis de planilha, Turnstile e Redis são necessárias para liberar a operação em produção.
+As variáveis de planilha são necessárias para gravar os envios em produção.
