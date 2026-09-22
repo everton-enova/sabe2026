@@ -14,6 +14,12 @@ export function validateLocation(mode: unknown, nte: unknown, local: unknown) {
    O polo tambem vem com acentuacao e espacos proprios de quem digitou. Sao as mesmas duas
    funcoes do Apps Script (nteNumber e normalized), de proposito: quando o webhook responde,
    e ele quem casa; quando cai na leitura publica, o criterio precisa ser identico. */
+/* Sem instanceof: o erro do fetch pode vir de outro realm (o vm dos testes, por exemplo),
+   e ali instanceof Error reprova um Error legitimo e a causa se perderia. */
+function nomeDoErro(error: unknown) {
+  const nome = (error as { name?: unknown } | null)?.name;
+  return typeof nome === "string" && nome ? nome : "erro desconhecido";
+}
 function nteNumber(value: unknown) {
   return String(Number(String(value ?? "").replace(/\D/g, "")));
 }
@@ -71,13 +77,13 @@ export async function sheets(payload: Record<string, unknown>) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store", signal: AbortSignal.timeout(15000),
     });
-  } catch {
+  } catch (error) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
-    throw new ApiError(502, "Não foi possível acessar a planilha.");
+    throw new ApiError(502, "Não foi possível acessar a planilha.", `a requisição ao Apps Script falhou (${nomeDoErro(error)}): confira se SABE_SHEETS_WEBHOOK_URL termina em /exec`);
   }
   if (!response.ok) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
-    throw new ApiError(502, "Não foi possível acessar a planilha.");
+    throw new ApiError(502, "Não foi possível acessar a planilha.", `o Apps Script respondeu HTTP ${response.status}: 401 ou 403 é implantação sem acesso "Qualquer pessoa"; 404 é URL /exec de uma implantação que não existe mais`);
   }
   let result: Record<string, unknown>;
   try {

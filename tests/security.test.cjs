@@ -89,4 +89,29 @@ test('webhook que responde ok sem coordinator nao vira erro generico 502', async
   assert.equal(response.status, 200);
   assert.equal((await response.json()).nome, 'Arionete Dourado Borges');
 });
+test('falha de envio diz a causa sem expor URL nem segredo', async () => {
+  const URL_WEBHOOK = 'https://script.google.com/macros/s/ABC123/exec';
+  const SEGREDO = 'segredo-de-teste';
+  const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).locations[0];
+  const envio = { modalidade: 'SM', acao: 'cadastrar', nte: location.nte, local: location.municipio,
+    nome: 'Pessoa Teste', email: 'teste@example.test', telefone: '71999999999', cpf: '529.982.247-25',
+    banco: '001 BANCO', agencia: '0001', conta: '12345', pix: 'teste@example.test' };
+  for (const [nome, fetchStub, esperado] of [
+    ['Apps Script recusa o acesso', async () => new Response('<html>Unauthorized</html>', { status: 403 }), 'HTTP 403'],
+    ['implantação não existe mais', async () => new Response('', { status: 404 }), 'HTTP 404'],
+    ['requisição não completa', async () => { throw new TypeError('fetch failed'); }, 'TypeError'],
+  ]) {
+    const { POST } = load('src/app/api/inscricoes/route.ts',
+      { SABE_SHEETS_WEBHOOK_URL: URL_WEBHOOK, SABE_WEBHOOK_SECRET: SEGREDO }, fetchStub);
+    const response = await POST(new Request(origin + '/api/inscricoes',
+      { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(envio) }));
+    assert.equal(response.status, 502, nome);
+    const body = await response.json();
+    assert.equal(body.message, 'Não foi possível acessar a planilha.', nome);
+    assert.ok(String(body.detalhe).includes(esperado), `${nome}: detalhe foi "${body.detalhe}"`);
+    const corpo = JSON.stringify(body);
+    assert.ok(!corpo.includes(SEGREDO), `${nome}: segredo vazou`);
+    assert.ok(!corpo.includes('ABC123'), `${nome}: URL do webhook vazou`);
+  }
+});
 module.exports = { load };

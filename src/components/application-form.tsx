@@ -176,6 +176,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           local: place,
           ...details,
           ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
+          // As colunas extras da planilha saíram das telas, mas continuam sendo enviadas como
+          // vieram: o Apps Script exige que "editar" repita adicionais igual ao registro atual,
+          // e a coluna DADOS ADICIONAIS da aba de saída segue preenchida como antes.
           ...(action === "editar" ? { adicionais: additional } : {}),
         }),
       });
@@ -256,7 +259,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <div><dt>NTE</dt><dd>{nte}</dd></div><div><dt>Polo</dt><dd>{place}</dd></div>
               <div><dt>Municípios do polo</dt><dd>{unique(data.locations.filter(item => item.nte === nte && item.polo === place).map(item => item.municipio)).join(", ") || "Não informado"}</dd></div>
               {Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details]}</dt><dd>{value || "Não informado"}</dd></div>)}
-              {additional.map((item, index) => <div key={index}><dt>{item.campo}</dt><dd>{item.valor || "Não informado"}</dd></div>)}
             </dl>
             {edited && <p role="status" className="notice">Correções preparadas. Confira os dados e valide para concluir o envio.</p>}
             <div className="form-actions split"><button type="button" className="button secondary" onClick={() => setStage("candidate")}>Voltar</button><div className="action-group"><button type="button" className="button secondary" onClick={editCurrent}>Editar Dados</button><button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); }}>Validar Indicação</button></div></div>
@@ -283,7 +285,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>Conta corrente<input name="conta" value={details.conta} onChange={(event) => setDetails({ ...details, conta: event.target.value })} required={action !== "editar"} /></label>
               <label>Chave Pix<input name="pix" value={details.pix} onChange={(event) => setDetails({ ...details, pix: event.target.value })} placeholder="CPF, e-mail, telefone ou aleatória" required={action !== "editar"} /></label>
             </div></fieldset>
-            {isCp && action === "editar" && additional.length > 0 && <fieldset><legend>Informações adicionais</legend><div className="field-grid">{additional.map((item, index) => <label key={index}>{item.campo}<input value={item.valor} maxLength={1000} onChange={event => setAdditional(previous => previous.map((entry, position) => position === index ? { ...entry, valor: event.target.value } : entry))} /></label>)}</div></fieldset>}
             {message && <p className="form-message error" role="alert">{message}</p>}
             <div className="form-actions split"><button className="button secondary" type="button" onClick={() => { if (isCp) { if (action === "editar" && coordinator) { openForm("validar"); } else setStage("candidate"); } else resetSelection(); }}>Cancelar</button><button className="button primary" type="submit">{isCp && action === "editar" ? "Conferir correções" : "Revisar dados"} <span>→</span></button></div>
           </form>
@@ -294,7 +295,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="section-heading"><span>03</span><div><h2>Revise antes de enviar</h2><p>Depois da confirmação, este formulário ficará indisponível para alterações.</p></div></div>
             <div className="review-block"><h3>Localização</h3><dl><div><dt>NTE</dt><dd>{nte}</dd></div><div><dt>{placeLabel}</dt><dd>{place}</dd></div></dl></div>
             <div className="review-block"><h3>{isCp && action === "validar" ? "Indicação validada" : "Responsável"}</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details]}</dt><dd>{value || "Não informado"}</dd></div>)}</dl></div>
-            {isCp && action !== "alterar" && additional.length > 0 && <div className="review-block"><h3>Informações adicionais</h3><dl>{additional.map((item, index) => <div key={index}><dt>{item.campo}</dt><dd>{item.valor || "Não informado"}</dd></div>)}</dl></div>}
             <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio.</span></label>
             {message && <p className="form-message error" role="alert">{message}</p>}
             <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>

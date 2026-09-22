@@ -1,5 +1,9 @@
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  /* "detalhe" acompanha a resposta para dizer POR QUE a planilha nao respondeu. Guarda apenas
+     status HTTP e nome do erro: nunca a URL do webhook nem o segredo. Sem isso, "Nao foi
+     possivel acessar a planilha" cobre implantacao errada, acesso restrito e queda de rede,
+     e cada palpite custa um redeploy as cegas. */
+  constructor(public status: number, message: string, public detail?: string) { super(message); }
 }
 export function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: {
@@ -8,7 +12,7 @@ export function json(data: unknown, status = 200) {
   } });
 }
 export function failure(error: unknown) {
-  if (error instanceof ApiError) return json({ message: error.message }, error.status);
+  if (error instanceof ApiError) return json({ message: error.message, ...(error.detail ? { detalhe: error.detail } : {}) }, error.status);
   console.error("SABE API failure", error);
   return json({ message: "Não foi possível consultar os dados deste polo." }, 502);
 }
