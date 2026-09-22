@@ -210,7 +210,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   return (
     <main className="form-page">
       <section className="form-intro">
-        <h1>{isCp ? "Coordenador de Polo" : "Supervisor Municipal"}</h1>
+        <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
         <div className="intro-copy"><p className="eyebrow">SABE 2026</p><p className="lead">
           {isCp
             ? "Selecione o NTE e o polo para conferir a indicação, corrigir dados ou indicar outro coordenador."
@@ -247,7 +247,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="section-heading"><span>02</span><div><h2>Confirme a indicação</h2><p>Verifique se a pessoa indicada continua responsável pelo polo.</p></div></div>
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar polo</button></div>
             <dl className="candidate-data"><div><dt>Nome indicado</dt><dd>{coordinator.nome}</dd></div><div><dt>CPF</dt><dd>{"•••.•••.•••-" + onlyDigits(coordinator.cpf).slice(-2)}</dd></div></dl>
-            <p className="notice"><strong>Atenção:</strong> confira os dados antes de validar. Use Alterar Coordenador de Polo somente para indicar outra pessoa.</p>
+            <p className="notice"><strong>Atenção:</strong> confira os dados antes de validar. A opção “Alterar Coordenador de Polo” deve ser utilizada exclusivamente para indicar outra pessoa.</p>
             <div className="form-actions split"><button className="button secondary" type="button" onClick={resetSelection}>Voltar</button><div className="action-group"><button className="button secondary" type="button" onClick={() => openForm("alterar")}>Alterar Coordenador de Polo</button><button className="button primary" type="button" onClick={() => openForm("validar")}>Validar Indicação <span>→</span></button></div></div>
           </div>
         )}
