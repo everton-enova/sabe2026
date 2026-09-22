@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-int
 export const metadata: Metadata = {
   title: "SABE 2026",
   description: "Plataforma de aplicações SABE 2026",
-  icons: { icon: "/icon.png", shortcut: "/icon.png", apple: "/icon.png" },
+  icons: { icon: "/favicon.png", shortcut: "/favicon.png", apple: "/favicon.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
