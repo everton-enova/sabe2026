@@ -1,6 +1,8 @@
 import { ApiError, failure, json, readRequest } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
 
+export const runtime = "nodejs";
+
 type Submission = Record<string, unknown>;
 
 const requiredBase = ["modalidade", "acao", "nte", "local"];

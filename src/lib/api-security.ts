@@ -8,8 +8,9 @@ export function json(data: unknown, status = 200) {
   } });
 }
 export function failure(error: unknown) {
-  return error instanceof ApiError ? json({ message: error.message }, error.status)
-    : json({ message: "Serviço indisponível. Tente novamente em instantes." }, 502);
+  if (error instanceof ApiError) return json({ message: error.message }, error.status);
+  console.error("SABE API failure", error);
+  return json({ message: "Não foi possível consultar os dados deste polo." }, 502);
 }
 export async function readRequest(request: Request): Promise<Record<string, unknown>> {
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") throw new ApiError(415, "Envie os dados em JSON.");
