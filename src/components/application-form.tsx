@@ -310,7 +310,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
             </div></fieldset>
             
-            <fieldset><legend>Dados bancários</legend><p className="field-help">A conta deve estar no nome do responsável informado acima.</p><div className="field-grid">
+            <fieldset><legend>Dados bancários</legend><p className="field-help">A conta bancária deve estar em nome do titular indicado acima. 
+    Para contas poupança, será aceita exclusivamente a Caixa Econômica Federal. Nesse caso, confira atentamente os dados da operação.</p><div className="field-grid">
               
               {/* NOVO CAMPO: TIPO DE CONTA */}
               <label>Tipo de Conta
