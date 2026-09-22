@@ -46,13 +46,16 @@ main > section > h2 { margin: 28px 0 16px 64px; font-size: .75rem; letter-spacin
 .application-list small { display: block; margin-top: 6px; color: var(--muted); font-size: 1rem; }
 
 .form-page { padding-top: clamp(36px, 6vw, 72px); }
-.form-intro { display: grid; grid-template-columns: 1fr 370px; gap: 14px 72px; align-items: end; padding-bottom: 44px; border-bottom: 1px solid var(--line-strong); }
+.form-intro { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; padding-bottom: 44px; border-bottom: 1px solid var(--line-strong); }
 .back-link { grid-column: 1 / -1; width: fit-content; margin-bottom: 18px; color: var(--muted); font-size: .875rem; font-weight: 700; }
 .back-link:hover { color: var(--blue); }
-.form-intro .eyebrow { grid-column: 1; }
 .form-intro h1 { grid-column: 1; font-size: clamp(2.8rem, 6vw, 5rem); }
-.form-intro .intro-copy { grid-column: 2; align-self: end; }
+.form-intro .intro-copy { grid-column: 1; max-width: 72ch; }
 .intro-copy .eyebrow { margin-bottom: 12px; }
+.intro-copy p:not(.eyebrow) { color: var(--muted); }
+.intro-copy p + p { margin-top: 10px; }
+.intro-copy strong { color: var(--text); }
+.intro-copy ol { margin: 10px 0 0; padding-left: 1.5rem; display: grid; gap: 6px; color: var(--muted); }
 .form-intro .lead { color: var(--muted); font-size: 1.05rem; }
 .access-field, .bot-check { margin-top: 24px; }
 .access-field .field-help { margin: 0; font-weight: 400; }
@@ -124,10 +127,9 @@ dd { font-weight: 700; word-break: break-word; }
   nav div { gap: 18px; }
   nav div a:first-child { display: none; }
   main { width: min(100% - 28px, 1120px); }
-  .hero, .form-intro { grid-template-columns: 1fr; }
-  .hero { gap: 20px; padding-bottom: 48px; }
+  .hero { grid-template-columns: 1fr; gap: 20px; padding-bottom: 48px; }
+  .form-intro { gap: 16px; }
   main > section > h2 { margin-left: 0; }
-  .form-intro .intro-copy { grid-column: 1; }
   .steps li { justify-content: center; padding: 16px 6px; font-size: 0; }
   .steps li span { font-size: .7rem; }
   .form-shell { margin-top: 28px; padding: 26px 20px; }
