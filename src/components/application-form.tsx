@@ -210,18 +210,40 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   return (
     <main className="form-page">
                   <section className="form-intro">
-              <div className="intro-stack">
-                <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Validação dos Supervisores Municipais"}</h1>
-                <div className="intro-copy">
-                  <p className="eyebrow">SABE 2026</p>
-                  <p className="lead">
-                    {isCp
-                      ? "Selecione o NTE e o polo para conferir a indicação, corrigir dados ou indicar outro coordenador."
-                      : "Selecione o NTE e o município antes de informar os dados do supervisor responsável."}
-                  </p>
-                </div>
-              </div>
-            </section>
+  <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
+  <div className="intro-copy">
+    <p className="eyebrow">SABE 2026</p>
+    {isCp ? (
+      <>
+        <p className="lead">Prezado(a) Diretor(a),</p>
+        <p>
+          Este formulário tem como objetivo validar os dados dos Coordenadores de Polo que
+          atuarão nas aplicações do SABE 2026, nas sedes de polo dos municípios pertencentes
+          aos seus respectivos Núcleos Territoriais de Educação (NTE).
+        </p>
+        <p><strong>Para realizar o preenchimento:</strong></p>
+        <ol>
+          <li>Selecione o seu NTE.</li>
+          <li>Selecione o município.</li>
+          <li>
+            Confira os dados apresentados dos Coordenadores de Polo que atuaram no SABE 2025 e
+            verifique se permanecem para o SABE 2026.
+          </li>
+          <li>Caso as informações estejam corretas, realize a validação.</li>
+          <li>
+            Caso seja necessária a substituição do Coordenador de Polo, selecione a opção
+            “Alterar Coordenador de Polo” e informe os dados da nova pessoa indicada.
+          </li>
+        </ol>
+        <p><strong>Confira todas as informações antes de concluir o formulário.</strong></p>
+      </>
+    ) : (
+      <p className="lead">
+        Selecione o NTE e o município antes de informar os dados do supervisor responsável.
+      </p>
+    )}
+  </div>
+</section>
 
       {stage !== "success" && (
         <ol className="steps" aria-label="Etapas do formulário">
