@@ -22,7 +22,9 @@ export type Coordinator = {
   cpf: string;
   banco: string;
   agencia: string;
+  agenciaDigito: string;
   conta: string;
+  contaDigito: string;
   pix: string;
   tipoConta: string;
   operacao: string;
@@ -36,7 +38,9 @@ export const emptyDetails: Details = {
   cpf: "",
   banco: "",
   agencia: "",
+  agenciaDigito: "",
   conta: "",
+  contaDigito: "",
   pix: "",
   tipoConta: "",
   operacao: "",
@@ -49,7 +53,9 @@ export const detailLabels: Record<keyof Details, string> = {
   cpf: "CPF",
   banco: "Banco",
   agencia: "Agência",
+  agenciaDigito: "Dígito Agência",
   conta: "Conta",
+  contaDigito: "Dígito Conta",
   pix: "Chave Pix",
   tipoConta: "Tipo de Conta",
   operacao: "Variação/Operação",
