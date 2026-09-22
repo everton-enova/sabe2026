@@ -1,66 +1,87 @@
-import { ApiError, failure, json, readRequest } from "@/lib/api-security";
-import { sheets, validateLocation } from "@/lib/sheets";
+import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = "nodejs";
-
-type Submission = Record<string, unknown>;
-
-const requiredBase = ["modalidade", "acao", "nte", "local"];
-const requiredDetails = ["nome", "email", "telefone", "cpf", "banco", "agencia", "conta", "pix"];
-
-function hasText(payload: Submission, field: string) {
-  return typeof payload[field] === "string" && payload[field].trim().length > 0;
-}
-
-function onlyDigits(value: unknown) {
-  return typeof value === "string" ? value.replace(/\D/g, "") : "";
-}
-
-function validCpf(value: unknown) {
-  const cpf = onlyDigits(value);
-  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-  const digit = (length: number) => {
-    const sum = cpf.slice(0, length).split("").reduce((total, number, index) => total + Number(number) * (length + 1 - index), 0);
-    const result = (sum * 10) % 11;
-    return result === 10 ? 0 : result;
-  };
-  return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
-}
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const payload = await readRequest(request);
-    const cp = payload.modalidade === "CP";
-    const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
-    if (!validFlow) throw new ApiError(400, "Modalidade ou ação inválida.");
-    validateLocation(payload.modalidade, payload.nte, payload.local);
-    const required = cp && payload.acao === "validar" ? requiredBase
-      : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"] : [...requiredBase, ...requiredDetails];
-    if (required.some(field => !hasText(payload, field))) throw new ApiError(400, "Preencha todos os campos obrigatórios.");
-    if (!(cp && payload.acao === "validar")) {
-      if ((hasText(payload, "email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payload.email))) || (hasText(payload, "telefone") && ![10, 11].includes(onlyDigits(payload.telefone).length)) || !validCpf(payload.cpf)) {
-        throw new ApiError(400, "Confira o e-mail, o telefone e o CPF informados.");
-      }
+    const body = await request.json();
+    
+    const webhookUrl = process.env.SABE_SHEETS_WEBHOOK_URL;
+    const webhookSecret = process.env.SABE_WEBHOOK_SECRET;
+    
+    // Validação das variáveis de ambiente
+    if (!webhookUrl) {
+      console.error('[SABE] SABE_SHEETS_WEBHOOK_URL não configurada');
+      return NextResponse.json(
+        { error: 'Configuração da planilha não encontrada. Contate o administrador.' },
+        { status: 500 }
+      );
     }
-    if (cp && (!hasText(payload, "registro") || !hasText(payload, "versao"))) throw new ApiError(400, "Consulte a indicação novamente.");
-    const allowed = [...requiredBase, ...requiredDetails, "registro", "versao"];
-    const submission: Submission = {};
-    if (cp && payload.acao === "editar") {
-      if (!Array.isArray(payload.adicionais) || payload.adicionais.length > 50 || payload.adicionais.some(item =>
-        !item || typeof item.campo !== "string" || item.campo.length > 200 || typeof item.valor !== "string" || item.valor.length > 1000)) {
-        throw new ApiError(400, "Informações adicionais inválidas.");
-      }
-      submission.adicionais = payload.adicionais.map(item => ({ campo: item.campo, valor: item.valor.trim() }));
+
+    if (!webhookSecret) {
+      console.error('[SABE] SABE_WEBHOOK_SECRET não configurada');
+      return NextResponse.json(
+        { error: 'Configuração de segurança não encontrada. Contate o administrador.' },
+        { status: 500 }
+      );
     }
-    for (const field of allowed) {
-      if (payload[field] !== undefined) {
-        if (typeof payload[field] !== "string" || payload[field].length > 500) throw new ApiError(400, "Campo inválido ou muito longo.");
-        submission[field] = payload[field].trim();
+
+    console.log('[SABE] Enviando dados para a planilha...', {
+      modalidade: body.modalidade,
+      nte: body.nte,
+      local: body.local,
+      acao: body.acao
+    });
+
+    // Faz a requisição para o Google Apps Script
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...body,
+        chave: webhookSecret,
+        enviadoEm: new Date().toISOString(),
+      }),
+      signal: AbortSignal.timeout(30000), // Timeout de 30 segundos
+    });
+
+    const result = await response.json();
+    console.log('[SABE] Resposta do Apps Script:', result);
+
+    // Se o Apps Script retornou erro
+    if (!response.ok || result.ok === false) {
+      const errorMessage = result.message || result.code || 'Erro desconhecido';
+      
+      // Tratamento específico para duplicidade
+      if (result.code === 'DUPLICATE') {
+        return NextResponse.json(
+          { error: 'Este NTE e Polo/Município já possui um registro validado. Alterações só podem ser feitas manualmente na planilha.', code: 'DUPLICATE' },
+          { status: 409 }
+        );
       }
+      
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: response.status || 400 }
+      );
     }
-    // Validation uses the source record, never identity/details supplied by the browser.
-    if (cp && payload.acao === "validar") for (const field of requiredDetails) delete submission[field];
-    await sheets({ ...submission, enviadoEm: new Date().toISOString() });
-    return json({ ok: true });
-  } catch (error) { return failure(error); }
+
+    return NextResponse.json({ success: true });
+    
+  } catch (error) {
+    console.error('[SABE] Erro na API de inscrições:', error);
+    
+    // Tratamento de timeout
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return NextResponse.json(
+        { error: 'Tempo limite excedido ao tentar salvar na planilha. Tente novamente.' },
+        { status: 504 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Não foi possível acessar a planilha. Tente novamente em alguns instantes.' },
+      { status: 500 }
+    );
+  }
 }
