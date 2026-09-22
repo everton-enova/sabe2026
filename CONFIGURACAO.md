@@ -28,7 +28,6 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 | --- | --- |
 | `SABE_SHEETS_WEBHOOK_URL` | URL `/exec` copiada do Apps Script |
 | `SABE_WEBHOOK_SECRET` | Mesmo segredo salvo nas propriedades do Apps Script |
-| `SABE_CP_ACCESS_CODE` | Código institucional com pelo menos 16 caracteres |
 | `SABE_APP_ORIGIN` | URL pública exata da aplicação, incluindo `https://` |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Site key do Cloudflare Turnstile |
 | `TURNSTILE_SECRET_KEY` | Secret key do Cloudflare Turnstile |
@@ -52,4 +51,4 @@ O Turnstile precisa ser configurado para as origens de produção e preview usad
 - Consulta autenticada dos dados do CP, com leitura otimizada e sem fallback público.
 - Formulários, validações e revisão.
 
-As variáveis de planilha, acesso institucional, Turnstile e Redis são necessárias para liberar a operação em produção.
+As variáveis de planilha, Turnstile e Redis são necessárias para liberar a operação em produção.

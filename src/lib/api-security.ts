@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -63,13 +63,6 @@ export async function readRequest(request: Request): Promise<Record<string, unkn
   catch { throw new ApiError(400, "Dados inválidos."); }
   if (!payload || Array.isArray(payload) || typeof payload !== "object") throw new ApiError(400, "Dados inválidos.");
   return payload;
-}
-export function authorizeCp(payload: Record<string, unknown>) {
-  const configured = process.env.SABE_CP_ACCESS_CODE;
-  if (!configured || configured.length < 16) throw new ApiError(503, "Acesso institucional ainda não configurado.");
-  const supplied = typeof payload.accessCode === "string" ? payload.accessCode : "";
-  const hash = (value: string) => createHash("sha256").update(value).digest();
-  if (!timingSafeEqual(hash(configured), hash(supplied))) throw new ApiError(403, "Código de acesso inválido.");
 }
 export async function verifyBot(payload: Record<string, unknown>, action: string) {
   const secret = process.env.TURNSTILE_SECRET_KEY;

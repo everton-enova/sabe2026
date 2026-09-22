@@ -38,12 +38,6 @@ test('rejects cross-origin, non-object JSON and oversized streams', async () => 
   await assert.rejects(security.readRequest(request([])), { status: 400 });
   await assert.rejects(security.readRequest(request({ data: 'a'.repeat(17000) })), { status: 413 });
 });
-test('institutional access fails closed and compares server-side', () => {
-  const security = load('src/lib/api-security.ts', { SABE_CP_ACCESS_CODE: 'institutional-test-code' });
-  assert.throws(() => security.authorizeCp({ accessCode: 'wrong' }), { status: 403 });
-  security.authorizeCp({ accessCode: 'institutional-test-code' });
-  assert.throws(() => load('src/lib/api-security.ts').authorizeCp({}), { status: 503 });
-});
 test('limits requests and fails closed in production without Redis', async () => {
   const security = load('src/lib/api-security.ts');
   for (let i = 0; i < 20; i++) await security.readRequest(request({}));

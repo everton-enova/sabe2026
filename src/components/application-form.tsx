@@ -55,7 +55,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [submitting, setSubmitting] = useState(false);
   const [loadingCandidate, setLoadingCandidate] = useState(false);
   const busy = useRef(false);
-  const [accessCode, setAccessCode] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [challenge, setChallenge] = useState(0);
   const [edited, setEdited] = useState(false);
@@ -100,7 +99,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       try {
         const response = await fetch("/api/indicacoes", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nte, polo: place, accessCode, turnstileToken }),
+          body: JSON.stringify({ nte, polo: place, turnstileToken }),
           cache: "no-store", signal: AbortSignal.timeout(30000),
         });
         const result = (await response.json()) as Coordinator & { message?: string };
@@ -181,7 +180,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           nte,
           local: place,
           ...details,
-          ...(isCp ? { accessCode, registro: coordinator?.registro, versao: coordinator?.versao } : {}),
+          ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
           turnstileToken,
           ...(action === "editar" ? { adicionais: additional } : {}),
         }),
@@ -242,7 +241,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>NTE<select disabled={loadingCandidate} value={nte} onChange={(event) => { setNte(event.target.value); setPlace(""); setMessage(""); }} required><option value="">Selecione o NTE</option>{ntes.map((item) => <option key={item}>{item}</option>)}</select></label>
               <label>{placeLabel}<select value={place} onChange={(event) => { setPlace(event.target.value); setMessage(""); }} disabled={!nte || loadingCandidate} required><option value="">Selecione {isCp ? "o polo" : "o município"}</option>{places.map((item) => <option key={item}>{item}</option>)}</select></label>
             </div>
-            {isCp && <div className="field-grid access-field"><label className="wide">Código de acesso institucional<input type="password" name="accessCode" autoComplete="current-password" value={accessCode} onChange={event => setAccessCode(event.target.value)} required disabled={loadingCandidate} /><span className="field-help">Utilize o código fornecido pela coordenação.</span></label></div>}
             {isCp && <BotCheck key={challenge} action="consulta_cp" onToken={setTurnstileToken} />}
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}

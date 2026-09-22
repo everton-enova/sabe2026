@@ -1,4 +1,4 @@
-import { ApiError, authorizeCp, failure, json, readRequest, verifyBot } from "@/lib/api-security";
+import { ApiError, failure, json, readRequest, verifyBot } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
 
 type Submission = Record<string, unknown>;
@@ -31,7 +31,6 @@ export async function POST(request: Request) {
     const cp = payload.modalidade === "CP";
     const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
     if (!validFlow) throw new ApiError(400, "Modalidade ou ação inválida.");
-    if (cp) authorizeCp(payload);
     validateLocation(payload.modalidade, payload.nte, payload.local);
     const required = cp && payload.acao === "validar" ? requiredBase
       : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"] : [...requiredBase, ...requiredDetails];
