@@ -129,17 +129,17 @@
     </label>
     
     {/* CAMPO: VARIAÇÃO/OPERAÇÃO (SÓ APARECE PARA POUPANÇA) */}
-        {details.tipoConta === "Poupança" && (
-        <label>Variação/Operação
-          <input 
-            name="operacao" 
-            value={details.operacao || ""} 
-            onChange={(event) => setDetails({ ...details, operacao: event.target.value })} 
-            required={action !== "editar"} 
-            placeholder="Ex: 0001, 01, etc."
-          />
-        </label>
-      )}
+        {String(details.tipoConta).trim() === "Poupança" && (
+          <label>Variação/Operação
+            <input 
+              name="operacao" 
+              value={details.operacao || ""} 
+              onChange={(event) => setDetails({ ...details, operacao: event.target.value })} 
+              required={action !== "editar"} 
+              placeholder="Ex: 0001, 01, etc."
+            />
+          </label>
+        )}
     
     {/* CAMPO: CHAVE PIX */}
     <label className="wide">Chave Pix
