@@ -45,7 +45,6 @@ function normalized(value: string) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
 }
 
-// Função para separar dígito da agência/conta
 function extractDigito(value: string): { principal: string; digito: string } {
   if (!value) return { principal: "", digito: "" };
   const partes = value.split(/[-–]/);
@@ -136,16 +135,12 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setMessage("");
     if (!nte || !place || busy.current) return;
 
+    // Verifica se o polo está validado na planilha
     if (validatedPlaces.includes(normalized(place))) {
       setMessage("Este polo já foi validado e não está mais disponível para alteração.");
       return;
     }
 
-    const locked = window.localStorage.getItem(`sabe2026:${mode}:${nte}:${place}`);
-    if (locked) {
-      setMessage("Este formulário já foi concluído neste dispositivo e não está mais disponível para alteração.");
-      return;
-    }
     if (isCp) {
       busy.current = true;
       setLoadingCandidate(true);
@@ -195,7 +190,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         })) as Details
       : { ...emptyDetails };
     
-    // Define os dígitos separadamente
     if (coordinator && newAction === "validar") {
       const agenciaParts = extractDigito(coordinator.agencia || "");
       const contaParts = extractDigito(coordinator.conta || "");
@@ -271,7 +265,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         }
         throw new Error(result.message || "Não foi possível concluir o envio.");
       }
-      window.localStorage.setItem(`sabe2026:${mode}:${nte}:${place}`, new Date().toISOString());
       setStage("success");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível concluir o envio.");
@@ -591,7 +584,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         )}
 
         {stage === "success" && (
-          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido. Como combinado, ele não está mais disponível para alteração neste dispositivo.</p></div>
+          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido e processado com sucesso.</p></div>
         )}
       </section>
     </main>
