@@ -5,7 +5,9 @@ export type Details = {
   cpf: string;
   banco: string;
   agencia: string;
+  agenciaDigito: string;
   conta: string;
+  contaDigito: string;
   pix: string;
   tipoConta: string;
   operacao: string;
