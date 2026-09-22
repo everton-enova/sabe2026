@@ -212,7 +212,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                   <section className="form-intro">
   <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
   <div className="intro-copy">
-    <p className="eyebrow">SABE 2026</p>
     {isCp ? (
       <>
         <p className="lead">Prezado(a) Diretor(a),</p>
