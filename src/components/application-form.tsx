@@ -369,9 +369,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                       })}
                     </div>
                   )}
-                  {details.tipoConta !== "Poupança" && (
-                    <button className="bank-other" type="button" onClick={() => { setBankChoice("__outro__"); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Não encontrou? Digitar outro banco</button>
-                  )}
+                  
                 </label>
               )}
               
