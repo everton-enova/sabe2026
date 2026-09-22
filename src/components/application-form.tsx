@@ -209,10 +209,19 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   return (
     <main className="form-page">
-      <section className="form-intro">
-        <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Cadastro dos Supervisores Municipais"}</h1>
-        
-      </section>
+                  <section className="form-intro">
+              <div className="intro-stack">
+                <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Validação dos Supervisores Municipais"}</h1>
+                <div className="intro-copy">
+                  <p className="eyebrow">SABE 2026</p>
+                  <p className="lead">
+                    {isCp
+                      ? "Selecione o NTE e o polo para conferir a indicação, corrigir dados ou indicar outro coordenador."
+                      : "Selecione o NTE e o município antes de informar os dados do supervisor responsável."}
+                  </p>
+                </div>
+              </div>
+            </section>
 
       {stage !== "success" && (
         <ol className="steps" aria-label="Etapas do formulário">
