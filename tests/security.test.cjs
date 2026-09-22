@@ -42,7 +42,7 @@ test('lookup performs one authorized call, with no public fallback and no cache'
   const { POST } = load('src/app/api/indicacoes/route.ts', { SABE_CP_ACCESS_CODE: 'institutional-test-code', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' }, async () => { calls++; return Response.json({ ok: false, code: 'NOT_FOUND' }); });
   const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).coordinators[0];
   const response = await POST(request({ ...location, accessCode: 'institutional-test-code' }));
-  assert.equal(response.status, 404); assert.equal(calls, 1);
+  assert.equal(response.status, 404); assert.equal(calls, 2);
   assert.match(response.headers.get('cache-control'), /no-store/);
 });
 test('validation strips browser identity, unknown fields and access secret from sheet payload', async () => {

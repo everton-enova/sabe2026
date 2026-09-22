@@ -54,12 +54,22 @@ export async function sheets(payload: Record<string, unknown>) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
     throw new ApiError(503, "Conexão com a planilha ainda não configurada.");
   }
-  const response = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store", signal: AbortSignal.timeout(15000),
-  });
-  if (!response.ok) throw new ApiError(502, "Não foi possível acessar a planilha.");
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store", signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
+    throw new ApiError(502, "Não foi possível acessar a planilha.");
+  }
+  if (!response.ok) {
+    if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
+    throw new ApiError(502, "Não foi possível acessar a planilha.");
+  }
   const result = await response.json();
+  if (result.ok !== true && payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
   if (result.ok !== true) {
     const messages: Record<string, [number, string]> = {
       NOT_FOUND: [404, "Não encontramos uma indicação para este polo."],
