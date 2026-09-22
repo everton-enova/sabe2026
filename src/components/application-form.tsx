@@ -301,7 +301,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>Telefone<input name="telefone" type="tel" inputMode="tel" autoComplete="tel" value={details.telefone} onChange={(event) => setDetails({ ...details, telefone: formatPhone(event.target.value) })} placeholder="(71) 99999-9999" required={action !== "editar"} /></label>
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
             </div></fieldset>
-            <fieldset><legend>Dados bancários</legend><p className="field-help">A conta deve estar no nome do responsável informado acima.</p><div className="field-grid">
+            <fieldset><legend>Dados bancários</legend><p className="field-help">A conta bancária deve estar em nome do titular indicado acima. Para contas poupança, será aceita exclusivamente a Caixa Econômica Federal. Nesse caso, confira atentamente os dados da operaçã</p><div className="field-grid">
               {bankChoice === "__outro__" ? (
                 <label>Banco não encontrado<input name="banco" value={details.banco} onChange={(event) => setDetails({ ...details, banco: event.target.value })} placeholder="Digite o nome ou número do banco" autoComplete="organization" required={action !== "editar"} /><button className="bank-other" type="button" onClick={() => { setBankChoice(""); setBankSearch(""); setDetails({ ...details, banco: "" }); }}>Voltar para a lista de bancos</button></label>
               ) : (
