@@ -210,7 +210,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   return (
     <main className="form-page">
       <section className="form-intro">
-        <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
+        <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Cadastro dos Supervisores Municipais"}</h1>
         
       </section>
 
