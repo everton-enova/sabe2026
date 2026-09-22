@@ -9,7 +9,7 @@
 5. Crie a propriedade `SABE_WEBHOOK_SECRET` e informe um segredo forte.
 6. Clique em **Implantar → Nova implantação**.
 7. Escolha **Aplicativo da Web**.
-8. Configure **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**. A planilha em si deve permanecer restrita à equipe; remova o compartilhamento público e não use mais o endpoint público de visualização.
+8. Configure **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**.
 9. Autorize o acesso solicitado e copie a URL final terminada em `/exec`.
 
 Para gerar um segredo no terminal:
@@ -31,7 +31,6 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 
 Marque os ambientes **Production**, **Preview** e **Development**. Depois abra **Deployments**, localize o último deploy e use **Redeploy** para que as variáveis entrem em vigor.
 
-
 ## 3. Teste final
 
 1. Abra `/aplicacao/cp`, selecione um NTE e um polo e confirme que nome e CPF aparecem.
@@ -42,7 +41,7 @@ Marque os ambientes **Production**, **Preview** e **Development**. Depois abra *
 ## O que funciona sem variáveis
 
 - Seleção de NTE, polo e município.
-- Consulta autenticada dos dados do CP, com leitura otimizada e sem fallback público.
+- Consulta de nome e CPF do CP.
 - Formulários, validações e revisão.
 
-As variáveis de planilha são necessárias para gravar os envios em produção.
+As variáveis são necessárias para gravar os envios na planilha e aplicar o bloqueio definitivo no servidor.

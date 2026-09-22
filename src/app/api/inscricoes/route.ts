@@ -1,8 +1,3 @@
-import { ApiError, failure, json, readRequest } from "@/lib/api-security";
-import { sheets, validateLocation } from "@/lib/sheets";
-
-export const runtime = "nodejs";
-
 type Submission = Record<string, unknown>;
 
 const requiredBase = ["modalidade", "acao", "nte", "local"];
@@ -28,39 +23,47 @@ function validCpf(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  let payload: Submission;
   try {
-    const payload = await readRequest(request);
-    const cp = payload.modalidade === "CP";
-    const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
-    if (!validFlow) throw new ApiError(400, "Modalidade ou ação inválida.");
-    validateLocation(payload.modalidade, payload.nte, payload.local);
-    const required = cp && payload.acao === "validar" ? requiredBase
-      : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"] : [...requiredBase, ...requiredDetails];
-    if (required.some(field => !hasText(payload, field))) throw new ApiError(400, "Preencha todos os campos obrigatórios.");
-    if (!(cp && payload.acao === "validar")) {
-      if ((hasText(payload, "email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payload.email))) || (hasText(payload, "telefone") && ![10, 11].includes(onlyDigits(payload.telefone).length)) || !validCpf(payload.cpf)) {
-        throw new ApiError(400, "Confira o e-mail, o telefone e o CPF informados.");
-      }
+    payload = (await request.json()) as Submission;
+  } catch {
+    return Response.json({ message: "Dados inválidos." }, { status: 400 });
+  }
+
+  const isCpValidation = payload.modalidade === "CP" && payload.acao === "validar";
+  const validFlow = (payload.modalidade === "CP" && ["validar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
+  if (!validFlow) return Response.json({ message: "Modalidade ou ação inválida." }, { status: 400 });
+  const required = isCpValidation ? requiredBase : [...requiredBase, ...requiredDetails];
+  if (required.some((field) => !hasText(payload, field))) {
+    return Response.json({ message: "Preencha todos os campos obrigatórios." }, { status: 400 });
+  }
+  if (!isCpValidation) {
+    const email = String(payload.email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || onlyDigits(payload.telefone).length < 10 || !validCpf(payload.cpf)) {
+      return Response.json({ message: "Confira o e-mail, o telefone e o CPF informados." }, { status: 400 });
     }
-    if (cp && (!hasText(payload, "registro") || !hasText(payload, "versao"))) throw new ApiError(400, "Consulte a indicação novamente.");
-    const allowed = [...requiredBase, ...requiredDetails, "registro", "versao"];
-    const submission: Submission = {};
-    if (cp && payload.acao === "editar") {
-      if (!Array.isArray(payload.adicionais) || payload.adicionais.length > 50 || payload.adicionais.some(item =>
-        !item || typeof item.campo !== "string" || item.campo.length > 200 || typeof item.valor !== "string" || item.valor.length > 1000)) {
-        throw new ApiError(400, "Informações adicionais inválidas.");
-      }
-      submission.adicionais = payload.adicionais.map(item => ({ campo: item.campo, valor: item.valor.trim() }));
-    }
-    for (const field of allowed) {
-      if (payload[field] !== undefined) {
-        if (typeof payload[field] !== "string" || payload[field].length > 500) throw new ApiError(400, "Campo inválido ou muito longo.");
-        submission[field] = payload[field].trim();
-      }
-    }
-    // Validation uses the source record, never identity/details supplied by the browser.
-    if (cp && payload.acao === "validar") for (const field of requiredDetails) delete submission[field];
-    await sheets({ ...submission, enviadoEm: new Date().toISOString() });
-    return json({ ok: true });
-  } catch (error) { return failure(error); }
+  }
+
+  const webhook = process.env.SABE_SHEETS_WEBHOOK_URL;
+  if (!webhook) {
+    return Response.json(
+      { message: "O formulário está pronto, mas a conexão de escrita com o Google Sheets ainda não foi configurada no Vercel." },
+      { status: 503 },
+    );
+  }
+
+  try {
+    const response = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, chave: process.env.SABE_WEBHOOK_SECRET, enviadoEm: new Date().toISOString() }),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Webhook returned ${response.status}`);
+    const result = (await response.json()) as { ok?: unknown; message?: unknown };
+    if (result.ok !== true) throw new Error(typeof result.message === "string" ? result.message : "Webhook rejected request");
+    return Response.json({ ok: true });
+  } catch {
+    return Response.json({ message: "Não foi possível gravar os dados. Tente novamente em instantes." }, { status: 502 });
+  }
 }
