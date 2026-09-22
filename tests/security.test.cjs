@@ -45,6 +45,12 @@ test('lookup performs one authorized call, with no public fallback and no cache'
   assert.equal(response.status, 404); assert.equal(calls, 2);
   assert.match(response.headers.get('cache-control'), /no-store/);
 });
+test('lookup falls back when webhook returns non-JSON', async () => {
+  const { POST } = load('src/app/api/indicacoes/route.ts', { SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' }, async url => String(url).includes('example.test') ? new Response('<html>temporary failure</html>', { status: 200 }) : Response.json({ ok: false }));
+  const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).coordinators[0];
+  const response = await POST(request({ ...location }));
+  assert.notEqual(response.status, 502);
+});
 test('validation strips browser identity, unknown fields and access secret from sheet payload', async () => {
   let sent;
   const { POST } = load('src/app/api/inscricoes/route.ts', { SABE_CP_ACCESS_CODE: 'institutional-test-code', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' }, async (_, options) => { sent = JSON.parse(options.body); return Response.json({ ok: true }); });

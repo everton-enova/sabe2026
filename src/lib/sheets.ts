@@ -68,7 +68,13 @@ export async function sheets(payload: Record<string, unknown>) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
     throw new ApiError(502, "Não foi possível acessar a planilha.");
   }
-  const result = await response.json();
+  let result: Record<string, unknown>;
+  try {
+    result = await response.json() as Record<string, unknown>;
+  } catch {
+    if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
+    throw new ApiError(502, "A planilha retornou uma resposta inválida.");
+  }
   if (result.ok !== true && payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
   if (result.ok !== true) {
     const messages: Record<string, [number, string]> = {
@@ -77,7 +83,8 @@ export async function sheets(payload: Record<string, unknown>) {
       DUPLICATE: [409, "Este formulário já foi enviado."],
       INVALID: [400, "Confira os dados informados."],
     };
-    const [status, message] = messages[result.code] || [502, "Não foi possível concluir a operação na planilha."];
+    const code = typeof result.code === "string" ? result.code : "";
+    const [status, message] = messages[code] || [502, "Não foi possível concluir a operação na planilha."];
     throw new ApiError(status, message);
   }
   return result;
