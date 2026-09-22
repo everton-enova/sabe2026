@@ -211,11 +211,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     <main className="form-page">
       <section className="form-intro">
         <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
-        <div className="intro-copy"><p className="eyebrow">SABE 2026</p><p className="lead">
-          {isCp
-            ? "Selecione o NTE e o polo para conferir a indicação, corrigir dados ou indicar outro coordenador."
-            : "Selecione o NTE e o município antes de informar os dados do supervisor responsável."}
-        </p></div>
+        
       </section>
 
       {stage !== "success" && (
