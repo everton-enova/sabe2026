@@ -1,34 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-  console.log('[SABE]  Iniciando consulta de indicação');
-  
   try {
     const body = await request.json();
-    console.log('[SABE] 📝 Body recebido:', { nte: body.nte, polo: body.polo });
-    
+
     const webhookUrl = process.env.SABE_SHEETS_WEBHOOK_URL;
     const webhookSecret = process.env.SABE_WEBHOOK_SECRET;
-    
-    console.log('[SABE] 🔑 Webhook URL configurada:', !!webhookUrl);
-    console.log('[SABE] 🔑 Secret configurado:', !!webhookSecret);
-    
+
     if (!webhookUrl || !webhookSecret) {
-      console.error('[SABE] ❌ Variáveis de ambiente faltando');
       return NextResponse.json(
         { error: 'Configuração não encontrada', code: 'CONFIG_ERROR' },
         { status: 500 }
       );
     }
 
-    console.log('[SABE] 🌐 Fazendo fetch para Apps Script...');
-    console.log('[SABE] URL:', webhookUrl);
-    
-    // Aumentei o timeout para 60 segundos
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
-    
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -38,17 +26,19 @@ export async function POST(request: NextRequest) {
         polo: body.polo,
         chave: webhookSecret,
       }),
-      signal: controller.signal,
+      signal: AbortSignal.timeout(55000),
     });
-    
-    clearTimeout(timeoutId);
-    
-    const elapsed = Date.now() - startTime;
-    console.log(`[SABE] ⏱️ Tempo de resposta: ${elapsed}ms`);
-    console.log('[SABE] 📊 Status:', response.status);
-    
-    const result = await response.json();
-    console.log('[SABE] 📄 Resposta:', JSON.stringify(result).substring(0, 500));
+
+    const text = await response.text();
+    let result: any;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return NextResponse.json(
+        { error: 'Resposta inválida da planilha. Tente novamente.', code: 'BAD_JSON' },
+        { status: 502 }
+      );
+    }
 
     if (result.code === 'ALREADY_VALIDATED') {
       return NextResponse.json(
@@ -57,27 +47,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!response.ok || result.ok === false) {
+    if (!response.ok || result.ok === false || !result.coordinator) {
       return NextResponse.json(
         { error: result.message || 'Indicação não encontrada', code: result.code || 'NOT_FOUND' },
-        { status: response.status || 404 }
+        { status: 404 }
       );
     }
 
-    console.log('[SABE] ✅ Sucesso! Coordenador:', result.coordinator?.nome);
     return NextResponse.json(result.coordinator);
-    
   } catch (error: any) {
-    const elapsed = Date.now() - startTime;
-    console.error(`[SABE] ❌ Erro após ${elapsed}ms:`, error.message);
-    
-    if (error.name === 'AbortError') {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
       return NextResponse.json(
-        { error: 'Tempo limite excedido. Tente novamente.', code: 'TIMEOUT' },
+        { error: 'A planilha demorou demais para responder. Tente novamente.', code: 'TIMEOUT' },
         { status: 504 }
       );
     }
-    
     return NextResponse.json(
       { error: 'Não foi possível consultar a indicação', code: 'ERROR' },
       { status: 500 }
