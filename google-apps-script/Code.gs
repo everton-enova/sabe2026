@@ -172,7 +172,8 @@ function migrarInscricoesParaCpSabe(spreadsheet, force) {
   const legacy = spreadsheet.getSheetByName("INSCRICOES CP");
   if (!legacy || legacy.getLastRow() < 2) { props.setProperty(MIGRACAO_FLAG, "ok"); return { migrados: 0 }; }
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(30000)) return { skipped: true };
+  // Espera curta: se outra requisicao ja estiver migrando, apenas sai e tenta depois.
+  if (!lock.tryLock(5000)) return { skipped: true };
   try {
     const cp = cpSheet(spreadsheet);
     if (!cp || cp.sheet.getLastRow() < 2) { props.setProperty(MIGRACAO_FLAG, "ok"); return { migrados: 0 }; }

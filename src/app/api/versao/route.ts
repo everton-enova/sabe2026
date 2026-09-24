@@ -20,7 +20,7 @@ export async function GET() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tipo: "status", chave: secret }),
       cache: "no-store",
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(55000),
     });
     const result = (await response.json().catch(() => null)) as StatusResponse | null;
     if (result?.versao) return json({ ok: true, versao: result.versao, migracao: result.migracao ?? null });
