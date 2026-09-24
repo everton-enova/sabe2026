@@ -40,7 +40,7 @@ function sheetFrom(rows, headers, reads) {
       setValues: values => values.forEach((row, i) => { rows[r - 1 + i] = rows[r - 1 + i] || []; row.forEach((value, j) => { rows[r - 1 + i][c - 1 + j] = value; }); }),
     }; } };
 }
-function fixture() {
+function fixture(legacyRows) {
   // Estrutura real da aba CP- SABE (20 colunas).
   const headers = ['Subcoordenador', 'NTE', 'POLO', 'POLO NOVO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF',
     'TEM EXPERIÊNCIA EM AVALIAÇÃO SIM/NÃO', 'FUNÇÃO QUE JÁ EXERCEU', 'TIPO DE CONTA', 'BANCO', 'AGENCIA',
@@ -52,14 +52,16 @@ function fixture() {
     'AGENCIA', 'DÍGITO AGÊNCIA', 'CONTA', 'DÍGITO CONTA', 'OPERAÇÃO', 'CHAVE PIX', 'ATUALIZADO', 'VALIDADO/ALTERADO FORM'];
   const smRows = [smHeaders, ['', 'NTE 18', 'ALAGOINHAS', '', '', '', '', '', '', '', '', '', '', '', '', '', '']];
   const output = []; const cache = new Map();
+  const scriptProps = new Map([['SABE_WEBHOOK_SECRET', 'test-secret']]);
   const source = sheetFrom(rows, headers);
   const smSource = sheetFrom(smRows, smHeaders);
+  const legacySource = legacyRows ? sheetFrom(legacyRows, legacyRows[0]) : null;
   const destination = { getLastRow: () => output.length, appendRow: row => output.push(row), getRange: () => ({ setValues: () => {}, getDisplayValues: () => [] }) };
-  const spreadsheet = { getSheetByName: name => name === 'CP- SABE ' ? source : name === 'SM-SABE' ? smSource : destination };
+  const spreadsheet = { getSheetByName: name => name === 'CP- SABE ' ? source : name === 'SM-SABE' ? smSource : name === 'INSCRICOES CP' && legacySource ? legacySource : destination };
   const sandbox = {
     SpreadsheetApp: { openById: () => spreadsheet },
     CacheService: { getScriptCache: () => ({ get: key => cache.get(key), put: (key, value) => cache.set(key, value), remove: key => cache.delete(key) }) },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: () => 'test-secret' }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: key => scriptProps.get(key), setProperty: (key, value) => scriptProps.set(key, value) }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
     Utilities: { DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (_, value) => [...crypto.createHash('sha256').update(value).digest()] },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: text => ({ setMimeType: () => JSON.parse(text) }) },
@@ -217,4 +219,44 @@ test('SM cadastrar: repetir o mesmo municipio e recusado', async () => {
   };
   assert.equal((await h.submit.POST(request('/api/inscricoes', envio))).status, 200);
   assert.equal((await h.submit.POST(request('/api/inscricoes', envio))).status, 409);
+});
+
+const legacyHeaders = ['DATA/HORA', 'MODALIDADE', 'AÇÃO', 'NTE', 'POLO/MUNICÍPIO', 'NOME', 'E-MAIL', 'TELEFONE', 'CPF',
+  'BANCO', 'AGÊNCIA', 'CONTA', 'CHAVE PIX', 'REGISTRO ORIGINAL', 'VERSÃO ORIGINAL', 'DADOS ADICIONAIS'];
+
+test('migracao: historico da INSCRICOES CP alimenta a CP- SABE (alterar)', () => {
+  const f = fixture([legacyHeaders,
+    ['2026-09-01 10:00:00', 'CP', 'alterar', 'NTE 18', 'ALAGOINHAS 01', 'Coordenador Novo', 'novo@example.test',
+      '71988887777', '111.444.777-35', '237 BRADESCO', '3597-1', '5433-0', 'novo@example.test', '7:2', 'v1', '[]']]);
+  const resultado = f.post({ tipo: 'migrar' });
+  assert.equal(resultado.ok, true);
+  assert.equal(resultado.migrados, 1);
+  assert.equal(f.rows[1][4], 'Coordenador Novo');
+  assert.equal(f.rows[1][7], '111.444.777-35');
+  assert.equal(f.rows[1][11], '237 BRADESCO');
+  assert.equal(f.rows[1][12], '3597');
+  assert.equal(f.rows[1][13], '1');
+  assert.equal(f.rows[1][14], '5433');
+  assert.equal(f.rows[1][15], '0');
+  assert.equal(f.rows[1][19], '✓');
+});
+
+test('migracao: registro de validar apenas marca, sem sobrescrever os dados', () => {
+  const f = fixture([legacyHeaders,
+    ['2026-09-01 10:00:00', 'CP', 'validar', 'NTE 18', 'ALAGOINHAS 01', 'FORGED', '', '', 'FORGED',
+      'FORGED', '999', '999', '', '7:2', 'v1', '[]']]);
+  const resultado = f.post({ tipo: 'migrar' });
+  assert.equal(resultado.migrados, 1);
+  assert.equal(f.rows[1][4], 'Pessoa Teste');
+  assert.equal(f.rows[1][7], '52998224725');
+  assert.equal(f.rows[1][11], 'Banco Teste');
+  assert.equal(f.rows[1][19], '✓');
+});
+
+test('migracao: roda sozinha uma vez e pode ser repetida com tipo migrar', () => {
+  const f = fixture([legacyHeaders,
+    ['2026-09-01 10:00:00', 'CP', 'validar', 'NTE 18', 'ALAGOINHAS 01', '', '', '', '', '', '', '', '', '7:2', 'v1', '[]']]);
+  assert.equal(f.post({ tipo: 'status' }).ok, true);
+  assert.equal(f.rows[1][19], '✓'); // migrou no primeiro contato
+  assert.equal(f.post({ tipo: 'migrar' }).migrados, 1); // idempotente/forcado
 });

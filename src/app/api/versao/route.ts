@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-type StatusResponse = { ok?: boolean; code?: string; versao?: string };
+type StatusResponse = { ok?: boolean; code?: string; versao?: string; migracao?: { migrados?: number; skipped?: boolean } };
 
 /* Diagnóstico simples e público: informa se o Apps Script publicado é o código atual.
    A versão antiga não conhece tipo:"status" e responde INVALID — é exatamente esse o sinal. */
@@ -23,7 +23,7 @@ export async function GET() {
       signal: AbortSignal.timeout(15000),
     });
     const result = (await response.json().catch(() => null)) as StatusResponse | null;
-    if (result?.versao) return json({ ok: true, versao: result.versao });
+    if (result?.versao) return json({ ok: true, versao: result.versao, migracao: result.migracao ?? null });
     return json({
       ok: false,
       code: result?.code || "DESATUALIZADO",

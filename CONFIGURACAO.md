@@ -50,6 +50,13 @@ https://SEU-PROJETO.vercel.app/api/versao
 - `{ "ok": true, "versao": "2026-09-24-sem-inscricoes" }` → o Apps Script novo está publicado.
 - `{ "ok": false, "code": "INVALID" }` → a implantação publicada ainda é **antiga** (por isso ainda grava em `INSCRICOES CP`). Repita o item 1 com **Nova versão**.
 
+Na primeira chamada válida, o script **migra sozinho** o histórico da `INSCRICOES CP` para a `CP- SABE` (a resposta traz `"migracao": { "migrados": N }`):
+
+- registros com ação `validar` → apenas marcam `ATUALIZADO` e `VALIDADO/ALTERADO FORM`;
+- registros com ação `editar`/`alterar` → gravam os dados na linha da `CP- SABE` (incluindo a separação de dígito de agência/conta) e marcam.
+
+A migração roda uma única vez. Para forçá-la de novo, apague a propriedade `MIGRACAO_INSCRICOES_CP` em **Configurações do projeto → Propriedades do script** e chame de novo, ou use internamente `tipo: "migrar"`.
+
 ## 4. Apagar as abas antigas
 
 No editor do Apps Script, escolha no topo a função **`removerAbasSaida`** e clique em **Executar** (uma vez). Isso apaga as abas `INSCRICOES CP` e `INSCRICOES SM`. Também é possível excluí-las à mão (botão direito na aba → Excluir).

@@ -13,6 +13,7 @@ function fixture() {
   const rows = [headers, ['Equipe', '01', 'POLO TESTE', '', 'Pessoa Teste', '71999999999', 'teste@example.test', '52998224725',
     'Sim', 'Coordenador', 'Corrente', 'Banco Teste', '0001', '1', '1234', '5', '', '', '', '']];
   const output = []; const reads = []; const cache = new Map();
+  const scriptProps = new Map([['SABE_WEBHOOK_SECRET', 'test-secret']]);
   const source = { getLastRow: () => rows.length, getLastColumn: () => headers.length, getSheetId: () => 7,
     getRange: (r, c, height, width) => { reads.push({ r, c, height, width }); return {
       getDisplayValues: () => rows.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)),
@@ -24,7 +25,7 @@ function fixture() {
   const sandbox = {
     SpreadsheetApp: { openById: () => spreadsheet },
     CacheService: { getScriptCache: () => ({ get: key => cache.get(key), put: (key, value) => cache.set(key, value), remove: key => cache.delete(key) }) },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: () => 'test-secret' }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: key => scriptProps.get(key), setProperty: (key, value) => scriptProps.set(key, value) }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
     Utilities: { DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (_, value) => [...crypto.createHash('sha256').update(value).digest()] },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: text => ({ setMimeType: () => JSON.parse(text) }) },

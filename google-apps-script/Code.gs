@@ -1,6 +1,7 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 /* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
 const CODE_VERSION = "2026-09-24-sem-inscricoes";
+const MIGRACAO_FLAG = "MIGRACAO_INSCRICOES_CP";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
    A planilha tem, entre outras: NOME(4) TELEFONE(5) E-MAIL(6) CPF(7)
@@ -154,6 +155,89 @@ function validAdicionais(adicionais, current) {
   return Array.isArray(adicionais) && adicionais.length === current.length &&
     adicionais.every((item, index) => item && item.campo === current[index].campo && typeof item.valor === "string" && item.valor.length <= 1000);
 }
+function splitDigito(value) {
+  const parts = String(value || "").split(/[-–]/);
+  if (parts.length === 2) return { principal: parts[0].trim(), digito: parts[1].trim() };
+  return { principal: String(value || "").trim(), digito: "" };
+}
+/* Aplica o historico da aba antiga INSCRICOES CP na CP- SABE.
+   Roda sozinha UMA VEZ (na primeira chamada apos publicar esta versao) e tambem pode
+   ser executada à mão no editor. Para repetir, apague a propriedade MIGRACAO_INSCRICOES_CP
+   nas Propriedades do script. Em lote (1 leitura + poucas escritas), sem tocar nas
+   colunas que nao fazem parte da validacao. */
+function migrarInscricoesParaCpSabe(spreadsheet, force) {
+  const props = PropertiesService.getScriptProperties();
+  if (!force && props.getProperty(MIGRACAO_FLAG) === "ok") return { skipped: true };
+  const legacy = spreadsheet.getSheetByName("INSCRICOES CP");
+  if (!legacy || legacy.getLastRow() < 2) { props.setProperty(MIGRACAO_FLAG, "ok"); return { migrados: 0 }; }
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return { skipped: true };
+  try {
+    const cp = cpSheet(spreadsheet);
+    if (!cp || cp.sheet.getLastRow() < 2) { props.setProperty(MIGRACAO_FLAG, "ok"); return { migrados: 0 }; }
+    const lHeaders = legacy.getRange(1, 1, 1, legacy.getLastColumn()).getDisplayValues()[0];
+    const at = (row, name, fallback) => {
+      const index = lHeaders.findIndex(header => normalized(header) === normalized(name));
+      return row[index >= 0 ? index : fallback] || "";
+    };
+    const registros = legacy.getRange(2, 1, legacy.getLastRow() - 1, legacy.getLastColumn()).getDisplayValues();
+    const all = cp.sheet.getRange(1, 1, cp.sheet.getLastRow(), cp.columns).getDisplayValues();
+    const nteColumn = cp.map.nte >= 0 ? cp.map.nte : 1;
+    const poloColumn = cp.map.polo >= 0 ? cp.map.polo : 2;
+    const rowNumberFor = (nte, local) => {
+      for (let index = 1; index < all.length; index += 1) {
+        if (nteNumber(all[index][nteColumn]) === nteNumber(nte) && normalized(all[index][poloColumn]) === normalized(local)) return index + 1;
+      }
+      return 0;
+    };
+    const plan = new Map();
+    let migrados = 0;
+    registros.forEach(row => {
+      const nte = at(row, "NTE", 3);
+      const local = at(row, "POLO/MUNICÍPIO", 4);
+      if (!nte || !local) return;
+      const rowNumber = rowNumberFor(nte, local);
+      if (!rowNumber) return;
+      const acao = normalized(at(row, "AÇÃO", 2)).toLowerCase();
+      const changes = plan.get(rowNumber) || {};
+      if (acao !== "validar") {
+        changes.nome = at(row, "NOME", 5);
+        changes.email = at(row, "E-MAIL", 6);
+        changes.telefone = at(row, "TELEFONE", 7);
+        changes.cpf = at(row, "CPF", 8);
+        changes.banco = at(row, "BANCO", 9);
+        const agencia = splitDigito(at(row, "AGÊNCIA", 10));
+        changes.agencia = agencia.principal;
+        if (agencia.digito) changes.agenciaDigito = agencia.digito;
+        const conta = splitDigito(at(row, "CONTA", 11));
+        changes.conta = conta.principal;
+        if (conta.digito) changes.contaDigito = conta.digito;
+        changes.pix = at(row, "CHAVE PIX", 12);
+      }
+      changes.atualizado = at(row, "DATA/HORA", 0) || new Date().toISOString();
+      changes.validado = "✓";
+      plan.set(rowNumber, changes);
+      migrados += 1;
+    });
+    plan.forEach((changes, rowNumber) => {
+      const target = all[rowNumber - 1];
+      if (!target) return;
+      Object.keys(changes).forEach(field => {
+        const column = cp.map[field];
+        if (column >= 0) target[column] = textCell(changes[field]);
+      });
+    });
+    const fields = new Set();
+    plan.forEach(changes => Object.keys(changes).forEach(field => fields.add(field)));
+    fields.forEach(field => {
+      const column = cp.map[field];
+      if (column < 0 || all.length < 2) return;
+      cp.sheet.getRange(2, column + 1, all.length - 1, 1).setValues(all.slice(1).map(row => [row[column]]));
+    });
+    props.setProperty(MIGRACAO_FLAG, "ok");
+    return { migrados };
+  } finally { lock.releaseLock(); }
+}
 function doGet() { return response({ ok: false, code: "UNAUTHORIZED" }); }
 /* Rode esta função UMA VEZ no editor do Apps Script (menu Executar) para apagar
    as abas de saída antigas. Não é chamada automaticamente. */
@@ -172,6 +256,10 @@ function doPost(event) {
   } catch (error) { return response({ ok: false, code: "INVALID" }); }
   if (!data || !isAuthorized(data.chave)) return response({ ok: false, code: "UNAUTHORIZED" });
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  if (data.tipo === "migrar") return response({ ok: true, ...migrarInscricoesParaCpSabe(spreadsheet, true) });
+  // Aplica o historico da aba antiga na CP- SABE (roda só uma vez, ver flag).
+  const migracao = migrarInscricoesParaCpSabe(spreadsheet);
+  if (data.tipo === "status") return response({ ok: true, versao: CODE_VERSION, migracao });
   if (data.tipo === "indicacao") {
     const coordinator = lookup(spreadsheet, data.nte, data.polo);
     return coordinator ? response({ ok: true, coordinator }) : response({ ok: false, code: "NOT_FOUND" });
