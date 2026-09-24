@@ -274,6 +274,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           if (key === "agencia" || key === "conta") {
             return [key, extractDigito(valor).principal];
           }
+          if (key === "nome" || key === "funcao") {
+            return [key, valor.toUpperCase()];
+          }
           return [key, valor];
         })) as Details
       : { ...emptyDetails };
@@ -466,7 +469,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="section-heading"><span>02</span><div><h2>Confirme a indicação</h2><p>Verifique se a pessoa indicada continua responsável pelo polo.</p></div></div>
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar polo</button></div>
             <dl className="candidate-data">
-              <div><dt>Nome indicado</dt><dd>{coordinator.nome || "Não informado"}</dd></div>
+              <div><dt>Nome indicado</dt><dd>{(coordinator.nome || "Não informado").toUpperCase()}</dd></div>
               <div><dt>CPF</dt><dd>{cpfMascarado}</dd></div>
             </dl>
             <p className="notice"><strong>Atenção:</strong> confira os dados antes de validar. A opção “Alterar Coordenador de Polo” deve ser utilizada exclusivamente para indicar outra pessoa.</p>
@@ -480,7 +483,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <dl className="candidate-data">
               <div><dt>NTE</dt><dd>{nte}</dd></div>
               <div><dt>Polo</dt><dd>{place}</dd></div>
-              <div><dt>Municípios do polo</dt><dd>{unique(data.locations.filter(item => item.nte === nte && item.polo === place).map(item => item.municipio)).join(", ") || "Não informado"}</dd></div>
+              <div><dt>Municípios do polo</dt><dd>{unique(data.locations.filter(item => item.nte === nte && normalized(item.polo) === normalized(place)).map(item => item.municipio)).join(", ") || "Não informado"}</dd></div>
               {Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details] || key}</dt><dd>{value || "Não informado"}</dd></div>)}
             </dl>
             {edited && <p role="status" className="notice">Correções preparadas. Confira os dados e valide para concluir o envio.</p>}
@@ -494,7 +497,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar {placeLabel.toLowerCase()}</button></div>
 
             <fieldset><legend>Dados pessoais</legend><div className="field-grid">
-              <label className="wide">Nome completo<input name="nome" autoComplete="name" value={details.nome} onChange={(event) => setDetails({ ...details, nome: event.target.value })} required /></label>
+              <label className="wide">Nome completo<input name="nome" autoComplete="name" value={details.nome} onChange={(event) => setDetails({ ...details, nome: event.target.value.toUpperCase() })} required /></label>
               <label>E-mail<input name="email" type="email" autoComplete="email" value={details.email} onChange={(event) => setDetails({ ...details, email: event.target.value })} required={action !== "editar"} /></label>
               <label>Telefone<input name="telefone" type="tel" inputMode="tel" autoComplete="tel" value={details.telefone} onChange={(event) => setDetails({ ...details, telefone: formatPhone(event.target.value) })} placeholder="(71) 99999-9999" required={action !== "editar"} /></label>
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
@@ -506,7 +509,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 </select>
               </label>
               <label>Função que já exerceu
-                <input name="funcao" value={details.funcao} onChange={(event) => setDetails({ ...details, funcao: event.target.value })} placeholder="Ex: Coordenador, Aplicador" required={action !== "editar"} />
+                <input name="funcao" value={details.funcao} onChange={(event) => setDetails({ ...details, funcao: event.target.value.toUpperCase() })} placeholder="Ex: COORDENADOR, APLICADOR" required={action !== "editar"} />
               </label>
             </div></fieldset>
 
