@@ -18,4 +18,8 @@ Em todas as ações de CP a aba oficial recebe a data/hora em **ATUALIZADO** e u
 em **VALIDADO/ALTERADO FORM**. A `INSCRICOES CP` não é mais usada para CP — a
 validação vive na própria `CP- SABE` e a aba pode ser excluída. O endpoint
 `tipo: "validados"` devolve os polos de um NTE cuja coluna **VALIDADO/ALTERADO FORM**
-está preenchida. A aba `INSCRICOES SM` continua sendo usada para o Supervisor Municipal.
+está preenchida.
+
+O Supervisor Municipal (`modalidade: "SM"`) grava na aba oficial **`SM-SABE`**, na
+linha do NTE + MUNICÍPIO, também com **ATUALIZADO** e **VALIDADO/ALTERADO FORM**.
+A aba `INSCRICOES SM` não é mais usada.

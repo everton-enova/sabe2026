@@ -41,7 +41,7 @@ Marque os ambientes **Production**, **Preview** e **Development**. Depois abra *
 
 1. Abra `/aplicacao/cp`, selecione um NTE e um polo e confirme que nome e CPF aparecem.
 2. Abra `/aplicacao/sm`, preencha um cadastro de teste e confirme o envio.
-3. Confira na aba `CP- SABE` se a linha do polo ficou com `✓` em `VALIDADO/ALTERADO FORM` e a data/hora em `ATUALIZADO` (e, no caso de editar/alterar, com os dados atualizados). Para o Supervisor Municipal, confira a aba `INSCRICOES SM`.
+3. Confira na aba `CP- SABE` se a linha do polo ficou com `✓` em `VALIDADO/ALTERADO FORM` e a data/hora em `ATUALIZADO` (e, no caso de editar/alterar, com os dados atualizados). Para o Supervisor Municipal, confira a aba `SM-SABE`.
 4. Exclua o cadastro de teste antes de liberar a aplicação.
 
 ## O que funciona sem variáveis

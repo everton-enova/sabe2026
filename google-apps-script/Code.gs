@@ -1,10 +1,5 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 const CP_SHEET = "CP- SABE ";
-const OUTPUT_HEADERS = [
-  "DATA/HORA", "MODALIDADE", "AÇÃO", "NTE", "POLO/MUNICÍPIO", "NOME",
-  "E-MAIL", "TELEFONE", "CPF", "BANCO", "AGÊNCIA", "CONTA", "CHAVE PIX",
-  "REGISTRO ORIGINAL", "VERSÃO ORIGINAL", "DADOS ADICIONAIS",
-];
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
    A planilha tem, entre outras: NOME(4) TELEFONE(5) E-MAIL(6) CPF(7)
    TIPO DE CONTA(10) BANCO(11) AGENCIA(12) DÍGITO AGÊNCIA(13) CONTA(14)
@@ -28,6 +23,26 @@ const CP_FIELDS = {
   validado: ["VALIDADO/ALTERADO FORM", "VALIDADO", "VALIDADO/ALTERADO"],
 };
 const CP_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao"];
+const SM_SHEET = "SM-SABE";
+const SM_FIELDS = {
+  nte: ["NTE"],
+  municipio: ["MUNICÍPIO", "MUNICIPIO"],
+  nome: ["NOME"],
+  telefone: ["TELEFONE", "CELULAR"],
+  email: ["E-MAIL", "EMAIL"],
+  cpf: ["CPF"],
+  tipoConta: ["TIPO DE CONTA", "TIPO CONTA"],
+  banco: ["BANCO"],
+  agencia: ["AGENCIA", "AGÊNCIA"],
+  agenciaDigito: ["DÍGITO AGÊNCIA", "DIGITO AGENCIA", "DÍGITO DA AGÊNCIA"],
+  conta: ["CONTA"],
+  contaDigito: ["DÍGITO CONTA", "DIGITO CONTA", "DÍGITO DA CONTA"],
+  operacao: ["OPERAÇÃO", "OPERACAO", "VARIAÇÃO/OPERAÇÃO"],
+  pix: ["CHAVE PIX", "PIX"],
+  atualizado: ["ATUALIZADO"],
+  validado: ["VALIDADO/ALTERADO FORM", "VALIDADO", "VALIDADO/ALTERADO"],
+};
+const SM_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao", "pix"];
 
 function response(data) {
   return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
@@ -49,21 +64,23 @@ function textCell(value) {
   // Sheets interprets leading '=' as a formula; also protect CSV exports.
   return /^[\s]*[=+@-]/.test(text) ? "'" + text : text;
 }
-function columnMap(headers) {
+function columnMap(headers, fields) {
   const map = {};
-  Object.keys(CP_FIELDS).forEach(field => {
-    const candidates = CP_FIELDS[field].map(normalized);
+  Object.keys(fields).forEach(field => {
+    const candidates = fields[field].map(normalized);
     map[field] = headers.findIndex(header => candidates.includes(normalized(header)));
   });
   return map;
 }
-function cpSheet(spreadsheet) {
-  const sheet = spreadsheet.getSheetByName(CP_SHEET);
+function sheetInfo(spreadsheet, name, fields) {
+  const sheet = spreadsheet.getSheetByName(name);
   if (!sheet || sheet.getLastRow() < 1) return null;
   const columns = sheet.getLastColumn();
   const headers = sheet.getRange(1, 1, 1, columns).getDisplayValues()[0];
-  return { sheet, headers, map: columnMap(headers), columns };
+  return { sheet, headers, map: columnMap(headers, fields), columns };
 }
+function cpSheet(spreadsheet) { return sheetInfo(spreadsheet, CP_SHEET, CP_FIELDS); }
+function smSheet(spreadsheet) { return sheetInfo(spreadsheet, SM_SHEET, SM_FIELDS); }
 function rowMatches(row, map, nte, polo) {
   const nteColumn = map.nte >= 0 ? map.nte : 1;
   const poloColumn = map.polo >= 0 ? map.polo : 2;
@@ -102,6 +119,12 @@ function lookup(spreadsheet, nte, polo) {
   });
   return coordinator;
 }
+function writeValidatedRow(info, rowNumber, data, dataFields) {
+  const write = (column, value) => { if (column >= 0) info.sheet.getRange(rowNumber, column + 1).setValue(textCell(value)); };
+  dataFields.forEach(field => { if (data[field] !== undefined) write(info.map[field], data[field]); });
+  write(info.map.atualizado, data.enviadoEm || new Date().toISOString());
+  write(info.map.validado, "✓");
+}
 /* Grava a validacao na propria aba oficial: atualiza os dados do coordenador
    (em editar/alterar) e marca ATUALIZADO + VALIDADO/ALTERADO FORM. */
 function updateCpRow(spreadsheet, current, data) {
@@ -109,14 +132,11 @@ function updateCpRow(spreadsheet, current, data) {
   if (!cp) return;
   const rowNumber = Number(String(current.registro).split(":")[1]);
   if (!(rowNumber >= 2)) return;
-  const write = (column, value) => { if (column >= 0) cp.sheet.getRange(rowNumber, column + 1).setValue(textCell(value)); };
-  if (data.acao !== "validar") {
-    CP_DATA_FIELDS.forEach(field => {
-      if (data[field] !== undefined) write(cp.map[field], data[field]);
-    });
-  }
-  write(cp.map.atualizado, data.enviadoEm || new Date().toISOString());
-  write(cp.map.validado, "✓");
+  writeValidatedRow(cp, rowNumber, data, data.acao === "validar" ? [] : CP_DATA_FIELDS);
+}
+/* SM: encontra a linha pelo NTE + MUNICÍPIO e grava os dados do supervisor. */
+function updateSmRow(spreadsheet, sm, rowNumber, data) {
+  writeValidatedRow(sm, rowNumber, data, SM_DATA_FIELDS);
 }
 function validatedPolos(spreadsheet, nte) {
   const cp = cpSheet(spreadsheet);
@@ -170,15 +190,16 @@ function doPost(event) {
       updateCpRow(spreadsheet, current, data);
       return response({ ok: true });
     }
-    const sheet = spreadsheet.getSheetByName("INSCRICOES SM") || spreadsheet.insertSheet("INSCRICOES SM");
-    if (sheet.getLastRow() === 0) sheet.appendRow(OUTPUT_HEADERS);
-    else sheet.getRange(1, 14, 1, 3).setValues([OUTPUT_HEADERS.slice(13)]);
-    const existing = sheet.getLastRow() > 1 ? sheet.getRange(2, 2, sheet.getLastRow() - 1, 4).getDisplayValues() : [];
-    if (existing.some(row => row[0] === data.modalidade && nteNumber(row[2]) === nteNumber(data.nte) && normalized(row[3]) === normalized(data.local))) return response({ ok: false, code: "DUPLICATE" });
-    const values = [data.enviadoEm, data.modalidade, data.acao, data.nte, data.local, data.nome,
-      data.email, data.telefone, data.cpf, data.banco, data.agencia, data.conta, data.pix,
-      data.registro, data.versao, JSON.stringify([])].map(textCell);
-    sheet.appendRow(values);
+    // SM: grava na aba oficial SM-SABE, na linha do NTE + município.
+    const sm = smSheet(spreadsheet);
+    if (!sm || sm.sheet.getLastRow() < 2) return response({ ok: false, code: "NOT_FOUND" });
+    const nteColumn = sm.map.nte >= 0 ? sm.map.nte : 1;
+    const municipioColumn = sm.map.municipio >= 0 ? sm.map.municipio : 2;
+    const rows = sm.sheet.getRange(2, 1, sm.sheet.getLastRow() - 1, sm.columns).getDisplayValues();
+    const offset = rows.findIndex(row => nteNumber(row[nteColumn]) === nteNumber(data.nte) && normalized(row[municipioColumn]) === normalized(data.local));
+    if (offset < 0) return response({ ok: false, code: "NOT_FOUND" });
+    if (sm.map.validado >= 0 && String(rows[offset][sm.map.validado] || "").trim()) return response({ ok: false, code: "DUPLICATE" });
+    updateSmRow(spreadsheet, sm, offset + 2, data);
     return response({ ok: true });
   } finally { lock.releaseLock(); }
 }

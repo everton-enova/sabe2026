@@ -32,6 +32,14 @@ function load(file, env = {}, fetch = async () => { throw new Error('Unexpected 
   return moduleAt(path.join(root, file));
 }
 
+function sheetFrom(rows, headers, reads) {
+  return { getLastRow: () => rows.length, getLastColumn: () => headers.length, getSheetId: () => 7,
+    getRange: (r, c, height, width) => { if (reads) reads.push({ r, c, height, width }); return {
+      getDisplayValues: () => rows.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)),
+      setValue: value => { rows[r - 1] = rows[r - 1] || []; rows[r - 1][c - 1] = value; },
+      setValues: values => values.forEach((row, i) => { rows[r - 1 + i] = rows[r - 1 + i] || []; row.forEach((value, j) => { rows[r - 1 + i][c - 1 + j] = value; }); }),
+    }; } };
+}
 function fixture() {
   // Estrutura real da aba CP- SABE (20 colunas).
   const headers = ['Subcoordenador', 'NTE', 'POLO', 'POLO NOVO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF',
@@ -39,15 +47,15 @@ function fixture() {
     'DÍGITO AGÊNCIA', 'CONTA', 'DÍGITO CONTA', 'OPERAÇÃO', 'Endereço de Polo ATUALIZADO?', 'ATUALIZADO', 'VALIDADO/ALTERADO FORM'];
   const rows = [headers, ['Equipe', 'NTE 18', 'ALAGOINHAS 01', '', 'Pessoa Teste', '71999999999', 'teste@example.test', '52998224725',
     'Sim', 'Coordenador', 'Corrente', 'Banco Teste', '0001', '1', '1234', '5', '', '', '', '']];
+  // Estrutura real da aba SM-SABE (17 colunas).
+  const smHeaders = ['Subcoordenador', 'NTE', 'MUNICÍPIO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF', 'TIPO DE CONTA', 'BANCO',
+    'AGENCIA', 'DÍGITO AGÊNCIA', 'CONTA', 'DÍGITO CONTA', 'OPERAÇÃO', 'CHAVE PIX', 'ATUALIZADO', 'VALIDADO/ALTERADO FORM'];
+  const smRows = [smHeaders, ['', 'NTE 18', 'ALAGOINHAS', '', '', '', '', '', '', '', '', '', '', '', '', '', '']];
   const output = []; const cache = new Map();
-  const source = { getLastRow: () => rows.length, getLastColumn: () => headers.length, getSheetId: () => 7,
-    getRange: (r, c, height, width) => ({
-      getDisplayValues: () => rows.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)),
-      setValue: value => { rows[r - 1] = rows[r - 1] || []; rows[r - 1][c - 1] = value; },
-      setValues: values => values.forEach((row, i) => { rows[r - 1 + i] = rows[r - 1 + i] || []; row.forEach((value, j) => { rows[r - 1 + i][c - 1 + j] = value; }); }),
-    }) };
+  const source = sheetFrom(rows, headers);
+  const smSource = sheetFrom(smRows, smHeaders);
   const destination = { getLastRow: () => output.length, appendRow: row => output.push(row), getRange: () => ({ setValues: () => {}, getDisplayValues: () => [] }) };
-  const spreadsheet = { getSheetByName: name => name === 'CP- SABE ' ? source : destination };
+  const spreadsheet = { getSheetByName: name => name === 'CP- SABE ' ? source : name === 'SM-SABE' ? smSource : destination };
   const sandbox = {
     SpreadsheetApp: { openById: () => spreadsheet },
     CacheService: { getScriptCache: () => ({ get: key => cache.get(key), put: (key, value) => cache.set(key, value), remove: key => cache.delete(key) }) },
@@ -58,7 +66,7 @@ function fixture() {
   };
   vm.createContext(sandbox); vm.runInContext(fs.readFileSync(path.join(root, 'google-apps-script/Code.gs'), 'utf8'), sandbox);
   const post = data => sandbox.doPost({ postData: { contents: JSON.stringify({ chave: 'test-secret', ...data }) } });
-  return { post, output, rows };
+  return { post, output, rows, smRows };
 }
 
 const env = { SABE_SHEETS_WEBHOOK_URL: 'https://example.test/exec', SABE_WEBHOOK_SECRET: 'test-secret' };
@@ -182,4 +190,31 @@ test('CP validar: versao desatualizada e recusada (CONFLICT)', async () => {
   }));
   assert.equal(response.status, 409);
   assert.equal(h.f.output.length, 0);
+});
+
+test('SM cadastrar: grava na aba SM-SABE na linha do NTE + municipio', async () => {
+  const h = harness();
+  const response = await h.submit.POST(request('/api/inscricoes', {
+    modalidade: 'SM', acao: 'cadastrar', nte: 'NTE 18', local: 'ALAGOINHAS',
+    nome: 'Supervisor Teste', email: 'sup@example.test', telefone: '71999998888',
+    cpf: '529.982.247-25', tipoConta: 'Corrente', banco: '001 BANCO',
+    agencia: '1234', agenciaDigito: '5', conta: '5678', contaDigito: '9', pix: 'sup@example.test',
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(h.f.output.length, 0, 'SM nao usa mais INSCRICOES SM');
+  assert.equal(h.f.smRows[1][2], 'ALAGOINHAS');
+  assert.equal(h.f.smRows[1][3], 'Supervisor Teste');
+  assert.equal(h.f.smRows[1][14], 'sup@example.test');
+  assert.equal(h.f.smRows[1][16], '✓');
+});
+
+test('SM cadastrar: repetir o mesmo municipio e recusado', async () => {
+  const h = harness();
+  const envio = {
+    modalidade: 'SM', acao: 'cadastrar', nte: 'NTE 18', local: 'ALAGOINHAS',
+    nome: 'Supervisor Teste', email: 'sup@example.test', telefone: '71999998888',
+    cpf: '529.982.247-25', banco: '001 BANCO', agencia: '1234', conta: '5678', pix: 'sup@example.test',
+  };
+  assert.equal((await h.submit.POST(request('/api/inscricoes', envio))).status, 200);
+  assert.equal((await h.submit.POST(request('/api/inscricoes', envio))).status, 409);
 });
