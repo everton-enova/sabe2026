@@ -35,7 +35,7 @@ pnpm build
 
 Copie `.env.example` para `.env.local` e configure `SABE_SHEETS_WEBHOOK_URL` com a URL publicada de um Google Apps Script. No Vercel, cadastre as mesmas variáveis de ambiente. O endpoint recebe JSON e só bloqueia o formulário no navegador depois que o webhook confirma a gravação.
 
-O arquivo `google-apps-script/Code.gs` contém o endpoint esperado. No Apps Script, defina a propriedade `SABE_WEBHOOK_SECRET`, publique como aplicativo da Web e use a URL `/exec` nas variáveis do projeto. O script rejeita GET, exige segredo, protege fórmulas inseridas, usa bloqueio concorrente e cria as abas `INSCRICOES CP` e `INSCRICOES SM` no primeiro envio.
+O arquivo `google-apps-script/Code.gs` contém o endpoint esperado. No Apps Script, defina a propriedade `SABE_WEBHOOK_SECRET`, publique como aplicativo da Web e use a URL `/exec` nas variáveis do projeto. O script rejeita GET, exige segredo, protege fórmulas inseridas, usa bloqueio concorrente e valida o CP diretamente na aba oficial `CP- SABE` (colunas **ATUALIZADO** e **VALIDADO/ALTERADO FORM**), criando apenas a aba `INSCRICOES SM` para o Supervisor Municipal.
 
 Em produção, configure apenas as variáveis da planilha descritas em `CONFIGURACAO.md`.
 

@@ -88,14 +88,12 @@ test('CP validar: consulta, confere e grava os dados da planilha (nao os do nave
     nome: 'FORGED', cpf: 'FORGED', injected: 'x',
   }));
   assert.equal(response.status, 200);
-  assert.equal(h.f.output.length, 2);
-  assert.equal(h.f.output[1][5], 'Pessoa Teste');   // NOME vem da planilha
-  assert.equal(h.f.output[1][8], '52998224725');    // CPF vem da planilha
-  assert.equal(h.f.output[1][2], 'validar');
+  assert.equal(h.f.output.length, 0, 'CP nao grava mais em INSCRICOES CP');
   // A propria aba oficial fica marcada como validada.
   assert.equal(h.f.rows[1][19], '✓');
   assert.ok(h.f.rows[1][18], 'ATUALIZADO deve receber a data/hora');
   assert.equal(h.f.rows[1][4], 'Pessoa Teste'); // validar nao troca os dados
+  assert.equal(h.f.rows[1][7], '52998224725');
 });
 
 test('CP validados: a lista de polos vem da coluna VALIDADO/ALTERADO FORM da CP- SABE', async () => {
@@ -123,11 +121,8 @@ test('CP editar: exige nome/cpf, envia adicionais e preserva o vinculo do regist
     adicionais: current.adicionais,
   }));
   assert.equal(response.status, 200);
-  assert.equal(h.f.output.length, 2);
-  assert.equal(h.f.output[1][2], 'editar');
-  assert.equal(h.f.output[1][5], 'Pessoa Teste Editada');
-  assert.equal(h.f.output[1][13], current.registro); // REGISTRO ORIGINAL preservado
-  // CP- SABE recebe os dados corrigidos in loco.
+  assert.equal(h.f.output.length, 0, 'CP nao grava mais em INSCRICOES CP');
+  // CP- SABE recebe os dados corrigidos in loco, na mesma linha.
   assert.equal(h.f.rows[1][4], 'Pessoa Teste Editada');
   assert.equal(h.f.rows[1][14], '9999');
   assert.equal(h.f.rows[1][19], '✓');
@@ -156,10 +151,7 @@ test('CP alterar: troca de pessoa grava os dados informados com CPF diferente', 
     banco: '001 BANCO', agencia: '1234', conta: '5678', pix: 'nova@example.test',
   }));
   assert.equal(response.status, 200);
-  assert.equal(h.f.output.length, 2);
-  assert.equal(h.f.output[1][2], 'alterar');
-  assert.equal(h.f.output[1][5], 'Nova Pessoa');
-  assert.equal(h.f.output[1][8], '111.444.777-35');
+  assert.equal(h.f.output.length, 0, 'CP nao grava mais em INSCRICOES CP');
   // CP- SABE passa a refletir a pessoa substituta.
   assert.equal(h.f.rows[1][4], 'Nova Pessoa');
   assert.equal(h.f.rows[1][7], '111.444.777-35');

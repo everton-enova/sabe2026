@@ -15,6 +15,7 @@ Na gravação, o script relê a indicação sob bloqueio e rejeita versões desa
 - `alterar` exige CPF diferente e grava a pessoa substituta na própria linha.
 
 Em todas as ações de CP a aba oficial recebe a data/hora em **ATUALIZADO** e um `✓`
-em **VALIDADO/ALTERADO FORM**. A aba de saída `INSCRICOES CP` continua sendo gravada
-como histórico/auditoria. O endpoint `tipo: "validados"` devolve os polos de um NTE
-cuja coluna **VALIDADO/ALTERADO FORM** está preenchida.
+em **VALIDADO/ALTERADO FORM**. A `INSCRICOES CP` não é mais usada para CP — a
+validação vive na própria `CP- SABE` e a aba pode ser excluída. O endpoint
+`tipo: "validados"` devolve os polos de um NTE cuja coluna **VALIDADO/ALTERADO FORM**
+está preenchida. A aba `INSCRICOES SM` continua sendo usada para o Supervisor Municipal.

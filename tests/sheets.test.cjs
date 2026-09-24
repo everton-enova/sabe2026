@@ -6,8 +6,12 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 
 function fixture() {
-  const headers = ['Subcoordenador', 'NTE', 'POLO', 'POLO NOVO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF', 'EXPERIÊNCIA', 'FUNÇÃO', 'BANCO', 'AGENCIA', 'CONTA'];
-  const rows = [headers, ['Equipe', '01', 'POLO TESTE', '', 'Pessoa Teste', '71999999999', 'teste@example.test', '52998224725', 'SIM', 'Aplicador', 'Banco Teste', '0001', '1234']];
+  // Estrutura real da aba oficial CP- SABE (20 colunas).
+  const headers = ['Subcoordenador', 'NTE', 'POLO', 'POLO NOVO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF',
+    'TEM EXPERIÊNCIA EM AVALIAÇÃO SIM/NÃO', 'FUNÇÃO QUE JÁ EXERCEU', 'TIPO DE CONTA', 'BANCO', 'AGENCIA',
+    'DÍGITO AGÊNCIA', 'CONTA', 'DÍGITO CONTA', 'OPERAÇÃO', 'Endereço de Polo ATUALIZADO?', 'ATUALIZADO', 'VALIDADO/ALTERADO FORM'];
+  const rows = [headers, ['Equipe', '01', 'POLO TESTE', '', 'Pessoa Teste', '71999999999', 'teste@example.test', '52998224725',
+    'Sim', 'Coordenador', 'Corrente', 'Banco Teste', '0001', '1', '1234', '5', '', '', '', '']];
   const output = []; const reads = []; const cache = new Map();
   const source = { getLastRow: () => rows.length, getLastColumn: () => headers.length, getSheetId: () => 7,
     getRange: (r, c, height, width) => { reads.push({ r, c, height, width }); return {
@@ -30,26 +34,36 @@ function fixture() {
   const lookup = () => post({ tipo: 'indicacao', nte: 'NTE 01', polo: 'POLO TESTE' }).coordinator;
   return { sandbox, rows, output, reads, post, lookup };
 }
-test('reads full selected record but indexes only NTE/polo; repeated lookup uses verified row pointer', () => {
+test('reads full selected record by header names and indexes only NTE/polo', () => {
   const f = fixture(); const record = f.lookup();
-  assert.equal(record.email, 'teste@example.test'); assert.equal(record.banco, 'Banco Teste'); assert.equal(record.adicionais.length, 4);
+  assert.equal(record.email, 'teste@example.test');
+  assert.equal(record.banco, 'Banco Teste');
+  assert.equal(record.tipoConta, 'Corrente');
+  assert.equal(record.agencia, '0001');
+  assert.equal(record.conta, '1234');
+  assert.equal(record.adicionais.length, 5);
   assert.ok(f.reads.some(read => read.c === 2 && read.width === 2));
   f.reads.length = 0; f.lookup(); assert.ok(!f.reads.some(read => read.c === 2 && read.width === 2));
   f.rows[1][2] = 'OUTRO POLO'; assert.equal(f.lookup(), undefined);
 });
-test('validation reads authoritative identity and server blocks repeat and stale submissions', () => {
+test('validar marca a CP- SABE e bloqueia repeticao e versao desatualizada', () => {
   const f = fixture(); const current = f.lookup();
   const data = { modalidade: 'CP', acao: 'validar', nte: 'NTE 01', local: 'POLO TESTE', registro: current.registro, versao: current.versao, nome: 'FORGED', cpf: 'FORGED' };
-  assert.equal(f.post(data).ok, true); assert.equal(f.output[1][5], 'Pessoa Teste'); assert.equal(f.output[1][8], '52998224725');
-  assert.equal(f.post(data).code, 'DUPLICATE');
-  f.rows[1][4] = 'Changed'; assert.equal(f.post(data).code, 'CONFLICT');
+  assert.equal(f.post(data).ok, true);
+  assert.equal(f.rows[1][4], 'Pessoa Teste');
+  assert.equal(f.rows[1][7], '52998224725');
+  assert.equal(String(f.rows[1][19]).trim(), '✓');
+  const refreshed = f.lookup();
+  assert.equal(f.post({ ...data, registro: refreshed.registro, versao: refreshed.versao }).code, 'DUPLICATE');
+  f.rows[1][4] = 'Changed';
+  assert.equal(f.post({ ...data, registro: refreshed.registro, versao: refreshed.versao }).code, 'CONFLICT');
 });
-test('editing preserves record link; replacing requires a different CPF; formulas remain text', () => {
+test('editar grava na propria linha; alterar exige CPF diferente; formula vira texto', () => {
   const f = fixture(); const current = f.lookup();
   const base = { modalidade: 'CP', nte: 'NTE 01', local: 'POLO TESTE', registro: current.registro, versao: current.versao, cpf: current.cpf };
   assert.equal(f.post({ ...base, acao: 'alterar' }).code, 'INVALID');
   assert.equal(f.post({ ...base, acao: 'editar', nome: '=IMPORTXML("bad")', adicionais: current.adicionais }).ok, true);
-  assert.equal(f.output[1][13], current.registro); assert.equal(f.output[1][5][0], "'");
+  assert.equal(f.rows[1][4][0], "'");
   assert.equal(f.sandbox.doGet().code, 'UNAUTHORIZED');
   assert.equal(f.post({ chave: 'wrong', tipo: 'indicacao' }).code, 'UNAUTHORIZED');
 });

@@ -166,18 +166,18 @@ function doPost(event) {
       }
       if (data.acao === "alterar" && onlyDigits(data.cpf) === onlyDigits(current.cpf)) return response({ ok: false, code: "INVALID" });
       if (data.acao === "editar" && !validAdicionais(data.adicionais, current.adicionais)) return response({ ok: false, code: "INVALID" });
+      // Unica fonte da validacao de CP: a propria aba oficial. INSCRICOES CP nao e mais usada.
+      updateCpRow(spreadsheet, current, data);
+      return response({ ok: true });
     }
-    const sheetName = cp ? "INSCRICOES CP" : "INSCRICOES SM";
-    const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
+    const sheet = spreadsheet.getSheetByName("INSCRICOES SM") || spreadsheet.insertSheet("INSCRICOES SM");
     if (sheet.getLastRow() === 0) sheet.appendRow(OUTPUT_HEADERS);
     else sheet.getRange(1, 14, 1, 3).setValues([OUTPUT_HEADERS.slice(13)]);
     const existing = sheet.getLastRow() > 1 ? sheet.getRange(2, 2, sheet.getLastRow() - 1, 4).getDisplayValues() : [];
     if (existing.some(row => row[0] === data.modalidade && nteNumber(row[2]) === nteNumber(data.nte) && normalized(row[3]) === normalized(data.local))) return response({ ok: false, code: "DUPLICATE" });
-    // A validacao oficial acontece na propria CP- SABE; a INSCRICOES CP fica como historico.
-    if (cp) updateCpRow(spreadsheet, current, data);
     const values = [data.enviadoEm, data.modalidade, data.acao, data.nte, data.local, data.nome,
       data.email, data.telefone, data.cpf, data.banco, data.agencia, data.conta, data.pix,
-      data.registro, data.versao, JSON.stringify(data.acao === "editar" ? data.adicionais : data.acao === "validar" ? current.adicionais : [])].map(textCell);
+      data.registro, data.versao, JSON.stringify([])].map(textCell);
     sheet.appendRow(values);
     return response({ ok: true });
   } finally { lock.releaseLock(); }
