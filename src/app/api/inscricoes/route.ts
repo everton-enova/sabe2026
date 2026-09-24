@@ -1,62 +1,68 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { ApiError, failure, json, readRequest } from "@/lib/api-security";
+import { sheets, validateLocation } from "@/lib/sheets";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+type Submission = Record<string, unknown>;
+
+const requiredBase = ["modalidade", "acao", "nte", "local"];
+const requiredDetails = ["nome", "email", "telefone", "cpf", "banco", "agencia", "conta", "pix"];
+
+function hasText(payload: Submission, field: string) {
+  return typeof payload[field] === "string" && payload[field].trim().length > 0;
+}
+
+function onlyDigits(value: unknown) {
+  return typeof value === "string" ? value.replace(/\D/g, "") : "";
+}
+
+function validCpf(value: unknown) {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  const digit = (length: number) => {
+    const sum = cpf.slice(0, length).split("").reduce((total, number, index) => total + Number(number) * (length + 1 - index), 0);
+    const result = (sum * 10) % 11;
+    return result === 10 ? 0 : result;
+  };
+  return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
+}
+
+export async function POST(request: Request) {
   try {
-    const body = await request.json();
-
-    const webhookUrl = process.env.SABE_SHEETS_WEBHOOK_URL;
-    const webhookSecret = process.env.SABE_WEBHOOK_SECRET;
-
-    if (!webhookUrl || !webhookSecret) {
-      return NextResponse.json(
-        { error: 'Configuração da planilha não encontrada', code: 'CONFIG_ERROR' },
-        { status: 500 }
-      );
+    const payload = await readRequest(request);
+    const cp = payload.modalidade === "CP";
+    const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
+    if (!validFlow) throw new ApiError(400, "Modalidade ou ação inválida.");
+    validateLocation(payload.modalidade, payload.nte, payload.local);
+    const required = cp && payload.acao === "validar" ? requiredBase
+      : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"] : [...requiredBase, ...requiredDetails];
+    if (required.some(field => !hasText(payload, field))) throw new ApiError(400, "Preencha todos os campos obrigatórios.");
+    if (!(cp && payload.acao === "validar")) {
+      if ((hasText(payload, "email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payload.email))) || (hasText(payload, "telefone") && ![10, 11].includes(onlyDigits(payload.telefone).length)) || !validCpf(payload.cpf)) {
+        throw new ApiError(400, "Confira o e-mail, o telefone e o CPF informados.");
+      }
     }
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...body,
-        chave: webhookSecret,
-        enviadoEm: new Date().toISOString(),
-      }),
-      signal: AbortSignal.timeout(55000),
-    });
-
-    const text = await response.text();
-    let result: any;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      return NextResponse.json(
-        { error: 'Resposta inválida da planilha. Tente novamente.', code: 'BAD_JSON' },
-        { status: 502 }
-      );
+    if (cp && (!hasText(payload, "registro") || !hasText(payload, "versao"))) throw new ApiError(400, "Consulte a indicação novamente.");
+    const allowed = [...requiredBase, ...requiredDetails, "registro", "versao"];
+    const submission: Submission = {};
+    if (cp && payload.acao === "editar") {
+      if (!Array.isArray(payload.adicionais) || payload.adicionais.length > 50 || payload.adicionais.some(item =>
+        !item || typeof item.campo !== "string" || item.campo.length > 200 || typeof item.valor !== "string" || item.valor.length > 1000)) {
+        throw new ApiError(400, "Informações adicionais inválidas.");
+      }
+      submission.adicionais = payload.adicionais.map(item => ({ campo: item.campo, valor: item.valor.trim() }));
     }
-
-    if (!response.ok || result.ok === false) {
-      return NextResponse.json(
-        { error: result.message || 'Erro ao salvar na planilha', code: result.code || 'ERROR' },
-        { status: response.status || 400 }
-      );
+    for (const field of allowed) {
+      if (payload[field] !== undefined) {
+        if (typeof payload[field] !== "string" || payload[field].length > 500) throw new ApiError(400, "Campo inválido ou muito longo.");
+        submission[field] = payload[field].trim();
+      }
     }
-
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
-      return NextResponse.json(
-        { error: 'A planilha demorou demais para responder. Tente novamente.', code: 'TIMEOUT' },
-        { status: 504 }
-      );
-    }
-    return NextResponse.json(
-      { error: 'Não foi possível acessar a planilha. Tente novamente.', code: 'ERROR' },
-      { status: 500 }
-    );
-  }
+    // Validation uses the source record, never identity/details supplied by the browser.
+    if (cp && payload.acao === "validar") for (const field of requiredDetails) delete submission[field];
+    await sheets({ ...submission, enviadoEm: new Date().toISOString() });
+    return json({ ok: true });
+  } catch (error) { return failure(error); }
 }

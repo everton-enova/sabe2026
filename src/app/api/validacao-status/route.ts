@@ -1,40 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { json } from "@/lib/api-security";
+import { sheets } from "@/lib/sheets";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+/* A leitura usa o mesmo webhook de 15s de lib/sheets.ts; nao ha mais chamada de 55s. */
 export const maxDuration = 60;
-export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const nte = searchParams.get('nte');
-    const mode = searchParams.get('mode');
-
-    if (!nte || mode !== 'cp') {
-      return NextResponse.json({ validated: [] });
-    }
-
-    const webhookUrl = process.env.SABE_SHEETS_WEBHOOK_URL;
-    const webhookSecret = process.env.SABE_WEBHOOK_SECRET;
-
-    if (!webhookUrl || !webhookSecret) {
-      return NextResponse.json({ validated: [] });
-    }
-
-    const response = await fetch(
-      `${webhookUrl}?acao=validados&nte=${encodeURIComponent(nte)}&mode=${mode}&chave=${encodeURIComponent(webhookSecret)}`,
-      { method: 'GET', signal: AbortSignal.timeout(55000) }
-    );
-
-    const text = await response.text();
-    let result: any;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      return NextResponse.json({ validated: [] });
-    }
-
-    return NextResponse.json({ validated: result.validated || [] });
-  } catch {
-    return NextResponse.json({ validated: [] });
+    const nte = searchParams.get("nte");
+    const mode = searchParams.get("mode");
+    if (!nte || mode !== "cp") return json({ validated: [] });
+    const result = await sheets({ tipo: "validados", nte }) as { validated?: unknown };
+    return json({ validated: Array.isArray(result.validated) ? result.validated : [] });
+  } catch (error) {
+    // O status e auxiliar: se a planilha nao responder, o formulario segue e o servidor
+    // ainda bloqueia duplicidade. Nunca transformar isso em erro de tela.
+    console.error("SABE validacao-status", error);
+    return json({ validated: [] });
   }
 }

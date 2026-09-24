@@ -50,6 +50,13 @@ function lookup(spreadsheet, nte, polo) {
   });
   return coordinator;
 }
+function validatedPolos(spreadsheet, nte) {
+  const sheet = spreadsheet.getSheetByName("INSCRICOES CP");
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  // Colunas 4 (NTE) e 5 (POLO/MUNICIPIO) da aba de saida.
+  const rows = sheet.getRange(2, 4, sheet.getLastRow() - 1, 2).getDisplayValues();
+  return rows.filter(row => nteNumber(row[0]) === nteNumber(nte)).map(row => normalized(row[1]));
+}
 function doGet() { return response({ ok: false, code: "UNAUTHORIZED" }); }
 function textCell(value) {
   const text = String(value || "");
@@ -67,6 +74,10 @@ function doPost(event) {
   if (data.tipo === "indicacao") {
     const coordinator = lookup(spreadsheet, data.nte, data.polo);
     return coordinator ? response({ ok: true, coordinator }) : response({ ok: false, code: "NOT_FOUND" });
+  }
+  if (data.tipo === "validados") {
+    if (!data.nte) return response({ ok: false, code: "INVALID" });
+    return response({ ok: true, validated: validatedPolos(spreadsheet, data.nte) });
   }
   const cp = data.modalidade === "CP";
   if (!(cp && ["validar", "editar", "alterar"].includes(data.acao)) && !(data.modalidade === "SM" && data.acao === "cadastrar")) return response({ ok: false, code: "INVALID" });

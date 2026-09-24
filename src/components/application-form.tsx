@@ -55,13 +55,44 @@ function extractDigito(value: string): { principal: string; digito: string } {
 }
 
 // Lê a resposta com segurança (nunca deixa a página crashar)
-async function safeJson(res: Response): Promise<any> {
+type ServerResponse = {
+  ok?: boolean;
+  code?: string;
+  message?: string;
+  error?: string;
+  validated?: unknown;
+  nome?: string;
+  registro?: string;
+  [key: string]: unknown;
+};
+
+async function safeJson(res: Response): Promise<ServerResponse> {
   const text = await res.text();
   try {
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed as ServerResponse : {};
   } catch {
     return { ok: false, code: "BAD_JSON", message: `Resposta inválida do servidor (status ${res.status}). Tente novamente.` };
   }
+}
+
+/* AbortSignal.timeout não existe em navegadores antigos; sem o fallback o próprio fetch
+   estoura e a tela mostra "erro" em vez de tentar de novo. 45s cobre a leitura de 15s
+   do webhook + o fallback público de 15s em lib/sheets.ts, com folga. */
+const REQUEST_TIMEOUT = 45000;
+function timeoutSignal(ms: number) {
+  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
+function friendlyError(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") return "A conexão demorou demais. Verifique a internet e tente novamente.";
+    return error.message || fallback;
+  }
+  return fallback;
 }
 
 export function ApplicationForm({ mode }: { mode: Mode }) {
@@ -91,6 +122,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   useEffect(() => {
     let ativo = true;
+    const controller = new AbortController();
     async function fetchValidatedPlaces() {
       if (!nte || !isCp) {
         setValidatedPlaces([]);
@@ -98,7 +130,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
       setLoadingValidated(true);
       try {
-        const response = await fetch(`/api/validacao-status?nte=${encodeURIComponent(nte)}&mode=${mode}`);
+        const response = await fetch(`/api/validacao-status?nte=${encodeURIComponent(nte)}&mode=${mode}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         const result = await safeJson(response);
         if (ativo) setValidatedPlaces(Array.isArray(result.validated) ? result.validated : []);
       } catch {
@@ -108,7 +143,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
     }
     fetchValidatedPlaces();
-    return () => { ativo = false; };
+    return () => { ativo = false; controller.abort(); };
   }, [nte, isCp, mode]);
 
   const places = useMemo(() => {
@@ -155,7 +190,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nte, polo: place }),
           cache: "no-store",
-          signal: AbortSignal.timeout(55000),
+          signal: timeoutSignal(REQUEST_TIMEOUT),
         });
         const result = await safeJson(response);
 
@@ -163,10 +198,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           throw new Error(result.message || result.error || "Não foi possível localizar a indicação.");
         }
 
-        setCoordinator(result as Coordinator);
+        setCoordinator(result as unknown as Coordinator);
         setStage("candidate");
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Não foi possível localizar a indicação.");
+        setMessage(friendlyError(error, "Não foi possível localizar a indicação."));
       } finally {
         busy.current = false;
         setLoadingCandidate(false);
@@ -181,7 +216,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
     const initial = newAction === "validar" && coordinator
       ? Object.fromEntries(Object.keys(emptyDetails).map(key => {
-          const valor = String((coordinator as any)[key] || "");
+          const valor = String((coordinator as unknown as Record<string, unknown>)[key] || "");
           if (key === "agencia" || key === "conta") {
             return [key, extractDigito(valor).principal];
           }
@@ -253,7 +288,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
           ...(action === "editar" ? { adicionais: additional } : {}),
         }),
-        signal: AbortSignal.timeout(55000),
+        signal: timeoutSignal(REQUEST_TIMEOUT),
       });
       const result = await safeJson(response);
       if (!response.ok || result.ok === false) {
@@ -261,7 +296,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
       setStage("success");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível concluir o envio.");
+      setMessage(friendlyError(error, "Não foi possível concluir o envio."));
     } finally {
       busy.current = false;
       setSubmitting(false);
@@ -345,7 +380,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <select
                   value={place}
                   onChange={(event) => { setPlace(event.target.value); setMessage(""); }}
-                  disabled={!nte || loadingCandidate || loadingValidated}
+                  disabled={!nte || loadingCandidate}
                   required
                 >
                   <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
@@ -358,6 +393,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               </label>
             </div>
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
+            {loadingValidated && <p role="status">Verificando polos já validados…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}
             <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
           </form>

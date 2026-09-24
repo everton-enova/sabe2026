@@ -28,8 +28,11 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 | --- | --- |
 | `SABE_SHEETS_WEBHOOK_URL` | URL `/exec` copiada do Apps Script |
 | `SABE_WEBHOOK_SECRET` | Mesmo segredo salvo nas propriedades do Apps Script |
+| `SABE_DIAGNOSTICO_SECRET` | (Opcional) Segredo para acessar `/api/diagnostico?chave=...`. Sem ele o endpoint fica fechado |
 
 Marque os ambientes **Production**, **Preview** e **Development**. Depois abra **Deployments**, localize o último deploy e use **Redeploy** para que as variáveis entrem em vigor.
+
+> Sempre que `google-apps-script/Code.gs` mudar (por exemplo, o retorno dos polos já validados), publique uma **nova implantação** ou edite a existente em **Implantar → Gerenciar implantações → Editar → Versão: Nova versão**.
 
 
 ## 3. Teste final
@@ -42,7 +45,7 @@ Marque os ambientes **Production**, **Preview** e **Development**. Depois abra *
 ## O que funciona sem variáveis
 
 - Seleção de NTE, polo e município.
-- Consulta autenticada dos dados do CP, com leitura otimizada e sem fallback público.
+- Consulta autenticada dos dados do CP, com leitura otimizada. Se o webhook falhar, a rota cai na leitura pública do CSV como última alternativa e registra a causa.
 - Formulários, validações e revisão.
 
 As variáveis de planilha são necessárias para gravar os envios em produção.
