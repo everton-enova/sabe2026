@@ -66,6 +66,7 @@ type ServerResponse = {
   message?: string;
   error?: string;
   validated?: unknown;
+  falha?: boolean;
   nome?: string;
   registro?: string;
   [key: string]: unknown;
@@ -121,6 +122,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [botAttempt, setBotAttempt] = useState(0);
   const needsBotCheck = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
   const [validatedPlaces, setValidatedPlaces] = useState<string[]>([]);
+  const [nteValidated, setNteValidated] = useState<string[]>([]);
+  const [perNteFallback, setPerNteFallback] = useState(false);
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
 
   const ntes = useMemo(
@@ -142,7 +145,11 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         const result = await safeJson(response);
         if (!ativo) return;
         const items = Array.isArray(result.validated) ? result.validated : [];
-        setValidatedPlaces(items
+        // Apps Script antigo devolve string pura (por NTE) ou recusa a chamada global:
+        // nesse caso caímos no modo por NTE ao selecionar o polo.
+        const antigo = result.falha === true || items.some((item) => typeof item === "string");
+        setPerNteFallback(antigo);
+        setValidatedPlaces(antigo ? [] : items
           .map((item) => {
             if (item && typeof item === "object") {
               const entry = item as { nte?: unknown; polo?: unknown };
@@ -152,7 +159,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           })
           .filter(Boolean));
       } catch {
-        if (ativo) setValidatedPlaces([]);
+        if (ativo) { setPerNteFallback(true); setValidatedPlaces([]); }
       } finally {
         if (ativo) setLoadingValidated(false);
       }
@@ -161,6 +168,38 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     return () => { ativo = false; controller.abort(); };
   }, [isCp, mode]);
 
+  // Modo antigo: consulta por NTE quando o Apps Script publicado ainda é a versão anterior.
+  useEffect(() => {
+    if (!isCp || !perNteFallback || !nte) return;
+    const controller = new AbortController();
+    let ativo = true;
+    async function loadForNte() {
+      try {
+        const response = await fetch(`/api/validacao-status?nte=${encodeURIComponent(nte)}&mode=${mode}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const result = await safeJson(response);
+        if (!ativo) return;
+        const items = Array.isArray(result.validated) ? result.validated : [];
+        setNteValidated(items
+          .map((item) => {
+            if (typeof item === "string") return normalized(item);
+            if (item && typeof item === "object") {
+              const entry = item as { polo?: unknown };
+              if (typeof entry.polo === "string") return normalized(entry.polo);
+            }
+            return "";
+          })
+          .filter(Boolean));
+      } catch {
+        if (ativo) setNteValidated([]);
+      }
+    }
+    loadForNte();
+    return () => { ativo = false; controller.abort(); };
+  }, [isCp, perNteFallback, nte, mode]);
+
   const places = useMemo(() => {
     if (!nte) return [];
     const placesList = unique(
@@ -168,9 +207,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     );
     return placesList.map(p => ({
       name: p,
-      isDisabled: validatedPlaces.includes(placeKey(nte, p))
+      isDisabled: validatedPlaces.includes(placeKey(nte, p)) || nteValidated.includes(normalized(p))
     }));
-  }, [isCp, nte, validatedPlaces]);
+  }, [isCp, nte, validatedPlaces, nteValidated]);
 
   const matchingBanks = useMemo(() => {
     const query = bankSearch.trim().toLocaleLowerCase("pt-BR");
@@ -191,7 +230,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setMessage("");
     if (!nte || !place || busy.current) return;
 
-    if (validatedPlaces.includes(placeKey(nte, place))) {
+    if (validatedPlaces.includes(placeKey(nte, place)) || nteValidated.includes(normalized(place))) {
       setMessage("Este polo já foi validado e não está mais disponível para alteração.");
       return;
     }

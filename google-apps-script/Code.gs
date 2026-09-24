@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 /* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
-const CODE_VERSION = "2026-09-24-sem-inscricoes";
+const CODE_VERSION = "2026-09-24-preload-global";
 const MIGRACAO_FLAG = "MIGRACAO_INSCRICOES_CP";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
@@ -265,7 +265,7 @@ function doPost(event) {
   if (data.tipo === "migrar") return response({ ok: true, ...migrarInscricoesParaCpSabe(spreadsheet, true) });
   // Aplica o historico da aba antiga na CP- SABE (roda só uma vez, ver flag).
   const migracao = migrarInscricoesParaCpSabe(spreadsheet);
-  if (data.tipo === "status") return response({ ok: true, versao: CODE_VERSION, migracao });
+  if (data.tipo === "status") return response({ ok: true, versao: CODE_VERSION, validadosGlobal: true, migracao });
   if (data.tipo === "indicacao") {
     const coordinator = lookup(spreadsheet, data.nte, data.polo);
     return coordinator ? response({ ok: true, coordinator }) : response({ ok: false, code: "NOT_FOUND" });
