@@ -14,7 +14,7 @@ function load(file, env = {}, fetch = async () => { throw new Error('Unexpected 
     const mod = { exports: {} }; cache.set(filename, mod.exports);
     const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
     vm.runInNewContext(code, {
-      exports: mod.exports, module: mod, Buffer, Request, Response, AbortSignal, URL, TextDecoder,
+      exports: mod.exports, module: mod, Buffer, Request, Response, AbortSignal, URL, URLSearchParams, TextDecoder,
       process: { env: { NODE_ENV: 'test', ...env } }, fetch,
       require: name => {
         if (name in overrides) return overrides[name];
@@ -39,7 +39,7 @@ test('rejects non-object JSON and oversized streams', async () => {
 });
 test('lookup performs one authorized call, with no public fallback and no cache', async () => {
   let calls = 0;
-  const { POST } = load('src/app/api/indicacoes/route.ts', { SABE_CP_ACCESS_CODE: 'institutional-test-code', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' }, async () => { calls++; return Response.json({ ok: false, code: 'NOT_FOUND' }); });
+  const { POST } = load('src/app/api/indicacoes/route.ts', { SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' }, async () => { calls++; return Response.json({ ok: false, code: 'NOT_FOUND' }); });
   const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).coordinators[0];
   const response = await POST(request({ ...location, accessCode: 'institutional-test-code' }));
   assert.equal(response.status, 404); assert.equal(calls, 2);
@@ -53,7 +53,7 @@ test('lookup falls back when webhook returns non-JSON', async () => {
 });
 test('validation strips browser identity, unknown fields and access secret from sheet payload', async () => {
   let sent;
-  const { POST } = load('src/app/api/inscricoes/route.ts', { SABE_CP_ACCESS_CODE: 'institutional-test-code', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' }, async (_, options) => { sent = JSON.parse(options.body); return Response.json({ ok: true }); });
+  const { POST } = load('src/app/api/inscricoes/route.ts', { SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' }, async (_, options) => { sent = JSON.parse(options.body); return Response.json({ ok: true }); });
   const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).coordinators[0];
   const response = await POST(request({ modalidade: 'CP', acao: 'validar', nte: location.nte, local: location.polo, registro: '1:2', versao: 'v1', nome: 'FORGED', cpf: 'FORGED', accessCode: 'institutional-test-code', injected: 'bad' }));
   assert.equal(response.status, 200);
@@ -113,5 +113,30 @@ test('falha de envio diz a causa sem expor URL nem segredo', async () => {
     assert.ok(!corpo.includes(SEGREDO), `${nome}: segredo vazou`);
     assert.ok(!corpo.includes('ABC123'), `${nome}: URL do webhook vazou`);
   }
+});
+test('turnstile exige token quando configurado e valida no siteverify', async () => {
+  const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).locations[0];
+  const envio = { modalidade: 'SM', acao: 'cadastrar', nte: location.nte, local: location.municipio,
+    nome: 'Pessoa Teste', email: 'teste@example.test', telefone: '71999999999', cpf: '529.982.247-25',
+    banco: '001 BANCO', agencia: '0001', conta: '12345', pix: 'teste@example.test' };
+  let calls = 0;
+  const semToken = load('src/app/api/inscricoes/route.ts',
+    { TURNSTILE_SECRET_KEY: 'turnstile-secret', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'site-key', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' },
+    async () => { calls++; return Response.json({ ok: true }); });
+  const bloqueado = await semToken.POST(request(envio));
+  assert.equal(bloqueado.status, 400);
+  assert.equal(calls, 0);
+  let verificacoes = 0;
+  const comToken = load('src/app/api/inscricoes/route.ts',
+    { TURNSTILE_SECRET_KEY: 'turnstile-secret', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'site-key', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' },
+    async url => { if (String(url).includes('siteverify')) { verificacoes++; return Response.json({ success: true }); } return Response.json({ ok: true }); });
+  const liberado = await comToken.POST(request({ ...envio, turnstileToken: 'token-valido' }));
+  assert.equal(liberado.status, 200);
+  assert.equal(verificacoes, 1);
+  // Apenas o secret (sem sitekey) nao pode travar envios: o widget nao renderiza no cliente.
+  const soSecret = load('src/app/api/inscricoes/route.ts',
+    { TURNSTILE_SECRET_KEY: 'turnstile-secret', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' },
+    async () => Response.json({ ok: true }));
+  assert.equal((await soSecret.POST(request(envio))).status, 200);
 });
 module.exports = { load };

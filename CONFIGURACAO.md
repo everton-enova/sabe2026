@@ -29,6 +29,8 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 | `SABE_SHEETS_WEBHOOK_URL` | URL `/exec` copiada do Apps Script |
 | `SABE_WEBHOOK_SECRET` | Mesmo segredo salvo nas propriedades do Apps Script |
 | `SABE_DIAGNOSTICO_SECRET` | (Opcional) Segredo para acessar `/api/diagnostico?chave=...`. Sem ele o endpoint fica fechado |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | (Opcional) Sitekey do Cloudflare Turnstile |
+| `TURNSTILE_SECRET_KEY` | (Opcional) Secret do Cloudflare Turnstile (mesmo par do sitekey) |
 
 Marque os ambientes **Production**, **Preview** e **Development**. Depois abra **Deployments**, localize o último deploy e use **Redeploy** para que as variáveis entrem em vigor.
 
@@ -47,5 +49,6 @@ Marque os ambientes **Production**, **Preview** e **Development**. Depois abra *
 - Seleção de NTE, polo e município.
 - Consulta autenticada dos dados do CP, com leitura otimizada. Se o webhook falhar, a rota cai na leitura pública do CSV como última alternativa e registra a causa.
 - Formulários, validações e revisão.
+- Verificação anti-bot fica desativada enquanto `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` não estiverem configuradas.
 
 As variáveis de planilha são necessárias para gravar os envios em produção.

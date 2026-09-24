@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useRef, useState, useEffect } from "react";
 import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
+import { BotCheck } from "@/components/bot-check";
 import { Coordinator, Details, detailLabels, emptyDetails } from "@/lib/cp";
 
 type Mode = "cp" | "sm";
@@ -112,6 +113,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [edited, setEdited] = useState(false);
   const [additional, setAdditional] = useState<Coordinator["adicionais"]>([]);
   const [message, setMessage] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [botAttempt, setBotAttempt] = useState(0);
+  const needsBotCheck = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
   const [validatedPlaces, setValidatedPlaces] = useState<string[]>([]);
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
 
@@ -287,6 +291,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           ...details,
           ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
           ...(action === "editar" ? { adicionais: additional } : {}),
+          turnstileToken,
         }),
         signal: timeoutSignal(REQUEST_TIMEOUT),
       });
@@ -296,6 +301,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
       setStage("success");
     } catch (error) {
+      // Token do Turnstile e de uso unico: descarta e remonta o widget para o proximo envio.
+      setTurnstileToken("");
+      setBotAttempt(attempt => attempt + 1);
       setMessage(friendlyError(error, "Não foi possível concluir o envio."));
     } finally {
       busy.current = false;
@@ -560,8 +568,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="review-block"><h3>Localização</h3><dl><div><dt>NTE</dt><dd>{nte}</dd></div><div><dt>{placeLabel}</dt><dd>{place}</dd></div></dl></div>
             <div className="review-block"><h3>{isCp && action === "validar" ? "Indicação validada" : "Responsável"}</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details] || key}</dt><dd>{value || "Não informado"}</dd></div>)}</dl></div>
             <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio.</span></label>
+            {needsBotCheck && <BotCheck key={botAttempt} action="sabe-envio" onToken={setTurnstileToken} />}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
+            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken)} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
           </div>
         )}
 

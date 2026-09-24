@@ -1,5 +1,6 @@
 import { ApiError, failure, json, readRequest } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
     const cp = payload.modalidade === "CP";
     const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
     if (!validFlow) throw new ApiError(400, "Modalidade ou ação inválida.");
+    const remoteIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+    await verifyTurnstile(payload.turnstileToken, remoteIp);
     validateLocation(payload.modalidade, payload.nte, payload.local);
     const required = cp && payload.acao === "validar" ? requiredBase
       : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"] : [...requiredBase, ...requiredDetails];
