@@ -12,6 +12,10 @@
 8. Configure **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**. A planilha em si deve permanecer restrita à equipe; remova o compartilhamento público e não use mais o endpoint público de visualização.
 9. Autorize o acesso solicitado e copie a URL final terminada em `/exec`.
 
+> **Cuidado:** depois de editar o código, use **Implantar → Gerenciar implantações → Editar (lápis) → Versão: Nova versão → Implantar**. Isso mantém a **mesma URL `/exec`**. Se você usar **"Nova implantação"**, é gerada uma URL nova e a Vercel continua apontando para a antiga (que roda o código velho).
+
+> **Este é o motivo mais comum de "ainda grava em INSCRICOES CP":** o código do repositório já não usa essa aba, mas o Apps Script **publicado** é uma versão antiga. A Vercel não atualiza o Apps Script — são dois deploys separados.
+
 Para gerar um segredo no terminal:
 
 ```powershell
@@ -33,13 +37,26 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 | `TURNSTILE_SECRET_KEY` | (Opcional) Secret do Cloudflare Turnstile (mesmo par do sitekey) |
 
 Marque os ambientes **Production**, **Preview** e **Development**. Depois abra **Deployments**, localize o último deploy e use **Redeploy** para que as variáveis entrem em vigor.
+> Sempre que `google-apps-script/Code.gs` mudar, edite a implantação existente em **Implantar → Gerenciar implantações → Editar → Versão: Nova versão**. Não crie uma "Nova implantação" (isso troca a URL e a Vercel fica apontando para o código antigo).
 
-> Sempre que `google-apps-script/Code.gs` mudar (por exemplo, o retorno dos polos já validados), publique uma **nova implantação** ou edite a existente em **Implantar → Gerenciar implantações → Editar → Versão: Nova versão**.
+## 3. Confirmar que a versão nova está no ar
 
+Abra no navegador:
 
-## 3. Teste final
+```
+https://SEU-PROJETO.vercel.app/api/versao
+```
 
-1. Abra `/aplicacao/cp`, selecione um NTE e um polo e confirme que nome e CPF aparecem.
+- `{ "ok": true, "versao": "2026-09-24-sem-inscricoes" }` → o Apps Script novo está publicado.
+- `{ "ok": false, "code": "INVALID" }` → a implantação publicada ainda é **antiga** (por isso ainda grava em `INSCRICOES CP`). Repita o item 1 com **Nova versão**.
+
+## 4. Apagar as abas antigas
+
+No editor do Apps Script, escolha no topo a função **`removerAbasSaida`** e clique em **Executar** (uma vez). Isso apaga as abas `INSCRICOES CP` e `INSCRICOES SM`. Também é possível excluí-las à mão (botão direito na aba → Excluir).
+
+## 5. Teste final
+
+1. Abra `/aplicacao/cp2` (enquanto o `/aplicacao/cp` estiver em manutenção), selecione um NTE e um polo e confirme que nome e CPF aparecem.
 2. Abra `/aplicacao/sm`, preencha um cadastro de teste e confirme o envio.
 3. Confira na aba `CP- SABE` se a linha do polo ficou com `✓` em `VALIDADO/ALTERADO FORM` e a data/hora em `ATUALIZADO` (e, no caso de editar/alterar, com os dados atualizados). Para o Supervisor Municipal, confira a aba `SM-SABE`.
 4. Exclua o cadastro de teste antes de liberar a aplicação.

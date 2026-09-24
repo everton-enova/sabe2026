@@ -1,4 +1,6 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
+/* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
+const CODE_VERSION = "2026-09-24-sem-inscricoes";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
    A planilha tem, entre outras: NOME(4) TELEFONE(5) E-MAIL(6) CPF(7)
@@ -153,6 +155,15 @@ function validAdicionais(adicionais, current) {
     adicionais.every((item, index) => item && item.campo === current[index].campo && typeof item.valor === "string" && item.valor.length <= 1000);
 }
 function doGet() { return response({ ok: false, code: "UNAUTHORIZED" }); }
+/* Rode esta função UMA VEZ no editor do Apps Script (menu Executar) para apagar
+   as abas de saída antigas. Não é chamada automaticamente. */
+function removerAbasSaida() {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  ["INSCRICOES CP", "INSCRICOES SM"].forEach(name => {
+    const sheet = spreadsheet.getSheetByName(name);
+    if (sheet) spreadsheet.deleteSheet(sheet);
+  });
+}
 function doPost(event) {
   let data;
   try {
@@ -165,9 +176,10 @@ function doPost(event) {
     const coordinator = lookup(spreadsheet, data.nte, data.polo);
     return coordinator ? response({ ok: true, coordinator }) : response({ ok: false, code: "NOT_FOUND" });
   }
+  if (data.tipo === "status") return response({ ok: true, versao: CODE_VERSION });
   if (data.tipo === "validados") {
     if (!data.nte) return response({ ok: false, code: "INVALID" });
-    return response({ ok: true, validated: validatedPolos(spreadsheet, data.nte) });
+    return response({ ok: true, versao: CODE_VERSION, validated: validatedPolos(spreadsheet, data.nte) });
   }
   const cp = data.modalidade === "CP";
   if (!(cp && ["validar", "editar", "alterar"].includes(data.acao)) && !(data.modalidade === "SM" && data.acao === "cadastrar")) return response({ ok: false, code: "INVALID" });
