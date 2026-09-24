@@ -180,3 +180,10 @@ option:disabled:hover {
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation-duration: 1.6s; }
 }
+
+.success-state .form-actions {
+  justify-content: center;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}

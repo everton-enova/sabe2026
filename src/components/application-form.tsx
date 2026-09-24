@@ -350,6 +350,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         throw new Error(result.message || result.error || "Não foi possível concluir o envio.");
       }
       setStage("success");
+      // O polo recém-validado já entra na lista, para aparecer marcado se voltar.
+      if (isCp) setValidatedPlaces(prev => prev.includes(placeKey(nte, place)) ? prev : [...prev, placeKey(nte, place)]);
     } catch (error) {
       // Token do Turnstile e de uso unico: descarta e remonta o widget para o proximo envio.
       setTurnstileToken("");
@@ -637,7 +639,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         )}
 
         {stage === "success" && (
-          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido e processado com sucesso.</p></div>
+          <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido e processado com sucesso.</p><div className="form-actions"><button type="button" className="button primary" onClick={resetSelection}>Fazer novo cadastro <span>→</span></button></div></div>
         )}
       </section>
     </main>
