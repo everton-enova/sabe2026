@@ -496,6 +496,16 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>E-mail<input name="email" type="email" autoComplete="email" value={details.email} onChange={(event) => setDetails({ ...details, email: event.target.value })} required={action !== "editar"} /></label>
               <label>Telefone<input name="telefone" type="tel" inputMode="tel" autoComplete="tel" value={details.telefone} onChange={(event) => setDetails({ ...details, telefone: formatPhone(event.target.value) })} placeholder="(71) 99999-9999" required={action !== "editar"} /></label>
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
+              <label>Tem experiência em avaliação
+                <select name="experiencia" value={details.experiencia || ""} onChange={(event) => setDetails({ ...details, experiencia: event.target.value })} required={action !== "editar"}>
+                  <option value="">Selecione</option>
+                  <option value="Sim">Sim</option>
+                  <option value="Não">Não</option>
+                </select>
+              </label>
+              <label>Função que já exerceu
+                <input name="funcao" value={details.funcao} onChange={(event) => setDetails({ ...details, funcao: event.target.value })} placeholder="Ex: Coordenador, Aplicador" required={action !== "editar"} />
+              </label>
             </div></fieldset>
 
             <fieldset><legend>Dados bancários</legend>

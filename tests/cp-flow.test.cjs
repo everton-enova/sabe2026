@@ -129,6 +129,7 @@ test('CP editar: exige nome/cpf, envia adicionais e preserva o vinculo do regist
     modalidade: 'CP', acao: 'editar', nte: 'NTE 18', local: 'ALAGOINHAS 01',
     registro: current.registro, versao: current.versao,
     nome: 'Pessoa Teste Editada', cpf: current.cpf,
+    experiencia: 'Sim', funcao: 'Supervisor',
     email: 'editado@example.test', telefone: '71988887777',
     banco: 'Banco Teste', agencia: '0001', conta: '9999', pix: 'editado@example.test',
     adicionais: current.adicionais,
@@ -137,6 +138,8 @@ test('CP editar: exige nome/cpf, envia adicionais e preserva o vinculo do regist
   assert.equal(h.f.output.length, 0, 'CP nao grava mais em INSCRICOES CP');
   // CP- SABE recebe os dados corrigidos in loco, na mesma linha.
   assert.equal(h.f.rows[1][4], 'Pessoa Teste Editada');
+  assert.equal(h.f.rows[1][8], 'Sim');
+  assert.equal(h.f.rows[1][9], 'Supervisor');
   assert.equal(h.f.rows[1][14], '9999');
   assert.equal(h.f.rows[1][19], '✓');
 });

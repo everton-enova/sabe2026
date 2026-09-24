@@ -11,7 +11,7 @@ type Submission = Record<string, unknown>;
 const requiredBase = ["modalidade", "acao", "nte", "local"];
 const requiredDetails = ["nome", "email", "telefone", "cpf", "banco", "agencia", "conta", "pix"];
 // Vao para a aba oficial CP- SABE junto com os dados basicos.
-const extraDetails = ["tipoConta", "agenciaDigito", "contaDigito", "operacao"];
+const extraDetails = ["experiencia", "funcao", "tipoConta", "agenciaDigito", "contaDigito", "operacao"];
 
 function hasText(payload: Submission, field: string) {
   return typeof payload[field] === "string" && payload[field].trim().length > 0;

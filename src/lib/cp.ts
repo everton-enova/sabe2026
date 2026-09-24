@@ -3,6 +3,8 @@ export type Details = {
   email: string;
   telefone: string;
   cpf: string;
+  experiencia: string;
+  funcao: string;
   banco: string;
   agencia: string;
   agenciaDigito: string;
@@ -36,6 +38,8 @@ export const emptyDetails: Details = {
   email: "",
   telefone: "",
   cpf: "",
+  experiencia: "",
+  funcao: "",
   banco: "",
   agencia: "",
   agenciaDigito: "",
@@ -51,6 +55,8 @@ export const detailLabels: Record<keyof Details, string> = {
   email: "E-mail",
   telefone: "Telefone",
   cpf: "CPF",
+  experiencia: "Tem experiência em avaliação",
+  funcao: "Função que já exerceu",
   banco: "Banco",
   agencia: "Agência",
   agenciaDigito: "Dígito Agência",

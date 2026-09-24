@@ -39,10 +39,12 @@ test('reads full selected record by header names and indexes only NTE/polo', () 
   const f = fixture(); const record = f.lookup();
   assert.equal(record.email, 'teste@example.test');
   assert.equal(record.banco, 'Banco Teste');
+  assert.equal(record.experiencia, 'Sim');
+  assert.equal(record.funcao, 'Coordenador');
   assert.equal(record.tipoConta, 'Corrente');
   assert.equal(record.agencia, '0001');
   assert.equal(record.conta, '1234');
-  assert.equal(record.adicionais.length, 5);
+  assert.equal(record.adicionais.length, 3);
   assert.ok(f.reads.some(read => read.c === 2 && read.width === 2));
   f.reads.length = 0; f.lookup(); assert.ok(!f.reads.some(read => read.c === 2 && read.width === 2));
   f.rows[1][2] = 'OUTRO POLO'; assert.equal(f.lookup(), undefined);

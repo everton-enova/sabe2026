@@ -10,6 +10,8 @@ const CP_SHEET = "CP- SABE ";
 const CP_FIELDS = {
   nte: ["NTE"],
   polo: ["POLO"],
+  experiencia: ["TEM EXPERIÊNCIA EM AVALIAÇÃO SIM/NÃO", "TEM EXPERIENCIA EM AVALIACAO SIM/NAO", "EXPERIÊNCIA EM AVALIAÇÃO", "EXPERIENCIA", "TEM EXPERIÊNCIA"],
+  funcao: ["FUNÇÃO QUE JÁ EXERCEU", "FUNCAO QUE JA EXERCEU", "FUNÇÃO", "FUNCAO"],
   nome: ["NOME"],
   telefone: ["TELEFONE", "CELULAR"],
   email: ["E-MAIL", "EMAIL"],
@@ -25,7 +27,7 @@ const CP_FIELDS = {
   atualizado: ["ATUALIZADO"],
   validado: ["VALIDADO/ALTERADO FORM", "VALIDADO", "VALIDADO/ALTERADO"],
 };
-const CP_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao"];
+const CP_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "experiencia", "funcao", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao"];
 const SM_SHEET = "SM-SABE";
 const SM_FIELDS = {
   nte: ["NTE"],
