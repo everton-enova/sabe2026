@@ -166,6 +166,7 @@ function splitDigito(value) {
    nas Propriedades do script. Em lote (1 leitura + poucas escritas), sem tocar nas
    colunas que nao fazem parte da validacao. */
 function migrarInscricoesParaCpSabe(spreadsheet, force) {
+  spreadsheet = spreadsheet || SpreadsheetApp.openById(SPREADSHEET_ID);
   const props = PropertiesService.getScriptProperties();
   if (!force && props.getProperty(MIGRACAO_FLAG) === "ok") return { skipped: true };
   const legacy = spreadsheet.getSheetByName("INSCRICOES CP");
@@ -247,6 +248,10 @@ function removerAbasSaida() {
     const sheet = spreadsheet.getSheetByName(name);
     if (sheet) spreadsheet.deleteSheet(sheet);
   });
+}
+/* Use no editor para FORÇAR a migração da INSCRICOES CP para a CP- SABE de novo. */
+function migrarAgora() {
+  return migrarInscricoesParaCpSabe(SpreadsheetApp.openById(SPREADSHEET_ID), true);
 }
 function doPost(event) {
   let data;
