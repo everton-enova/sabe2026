@@ -10,7 +10,11 @@ function fixture() {
   const rows = [headers, ['Equipe', '01', 'POLO TESTE', '', 'Pessoa Teste', '71999999999', 'teste@example.test', '52998224725', 'SIM', 'Aplicador', 'Banco Teste', '0001', '1234']];
   const output = []; const reads = []; const cache = new Map();
   const source = { getLastRow: () => rows.length, getLastColumn: () => headers.length, getSheetId: () => 7,
-    getRange: (r, c, height, width) => { reads.push({ r, c, height, width }); return { getDisplayValues: () => rows.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)) }; } };
+    getRange: (r, c, height, width) => { reads.push({ r, c, height, width }); return {
+      getDisplayValues: () => rows.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)),
+      setValue: value => { rows[r - 1] = rows[r - 1] || []; rows[r - 1][c - 1] = value; },
+      setValues: values => values.forEach((row, i) => { rows[r - 1 + i] = rows[r - 1 + i] || []; row.forEach((value, j) => { rows[r - 1 + i][c - 1 + j] = value; }); }),
+    }; } };
   const destination = { getLastRow: () => output.length, appendRow: row => output.push(row), getRange: (r, c, height, width) => ({ setValues: () => {}, getDisplayValues: () => output.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)) }) };
   const spreadsheet = { getSheetByName: name => name === 'CP- SABE ' ? source : destination };
   const sandbox = {

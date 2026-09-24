@@ -10,6 +10,8 @@ type Submission = Record<string, unknown>;
 
 const requiredBase = ["modalidade", "acao", "nte", "local"];
 const requiredDetails = ["nome", "email", "telefone", "cpf", "banco", "agencia", "conta", "pix"];
+// Vao para a aba oficial CP- SABE junto com os dados basicos.
+const extraDetails = ["tipoConta", "agenciaDigito", "contaDigito", "operacao"];
 
 function hasText(payload: Submission, field: string) {
   return typeof payload[field] === "string" && payload[field].trim().length > 0;
@@ -48,7 +50,7 @@ export async function POST(request: Request) {
       }
     }
     if (cp && (!hasText(payload, "registro") || !hasText(payload, "versao"))) throw new ApiError(400, "Consulte a indicação novamente.");
-    const allowed = [...requiredBase, ...requiredDetails, "registro", "versao"];
+    const allowed = [...requiredBase, ...requiredDetails, ...extraDetails, "registro", "versao"];
     const submission: Submission = {};
     if (cp && payload.acao === "editar") {
       if (!Array.isArray(payload.adicionais) || payload.adicionais.length > 50 || payload.adicionais.some(item =>
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
       }
     }
     // Validation uses the source record, never identity/details supplied by the browser.
-    if (cp && payload.acao === "validar") for (const field of requiredDetails) delete submission[field];
+    if (cp && payload.acao === "validar") for (const field of [...requiredDetails, ...extraDetails]) delete submission[field];
     await sheets({ ...submission, enviadoEm: new Date().toISOString() });
     return json({ ok: true });
   } catch (error) { return failure(error); }

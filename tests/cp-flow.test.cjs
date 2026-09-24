@@ -33,11 +33,19 @@ function load(file, env = {}, fetch = async () => { throw new Error('Unexpected 
 }
 
 function fixture() {
-  const headers = ['Subcoordenador', 'NTE', 'POLO', 'POLO NOVO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF', 'EXPERIÊNCIA', 'FUNÇÃO', 'BANCO', 'AGENCIA', 'CONTA'];
-  const rows = [headers, ['Equipe', 'NTE 18', 'ALAGOINHAS 01', '', 'Pessoa Teste', '71999999999', 'teste@example.test', '52998224725', 'SIM', 'Aplicador', 'Banco Teste', '0001', '1234']];
+  // Estrutura real da aba CP- SABE (20 colunas).
+  const headers = ['Subcoordenador', 'NTE', 'POLO', 'POLO NOVO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF',
+    'TEM EXPERIÊNCIA EM AVALIAÇÃO SIM/NÃO', 'FUNÇÃO QUE JÁ EXERCEU', 'TIPO DE CONTA', 'BANCO', 'AGENCIA',
+    'DÍGITO AGÊNCIA', 'CONTA', 'DÍGITO CONTA', 'OPERAÇÃO', 'Endereço de Polo ATUALIZADO?', 'ATUALIZADO', 'VALIDADO/ALTERADO FORM'];
+  const rows = [headers, ['Equipe', 'NTE 18', 'ALAGOINHAS 01', '', 'Pessoa Teste', '71999999999', 'teste@example.test', '52998224725',
+    'Sim', 'Coordenador', 'Corrente', 'Banco Teste', '0001', '1', '1234', '5', '', '', '', '']];
   const output = []; const cache = new Map();
   const source = { getLastRow: () => rows.length, getLastColumn: () => headers.length, getSheetId: () => 7,
-    getRange: (r, c, height, width) => ({ getDisplayValues: () => rows.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)) }) };
+    getRange: (r, c, height, width) => ({
+      getDisplayValues: () => rows.slice(r - 1, r - 1 + height).map(row => row.slice(c - 1, c - 1 + width)),
+      setValue: value => { rows[r - 1] = rows[r - 1] || []; rows[r - 1][c - 1] = value; },
+      setValues: values => values.forEach((row, i) => { rows[r - 1 + i] = rows[r - 1 + i] || []; row.forEach((value, j) => { rows[r - 1 + i][c - 1 + j] = value; }); }),
+    }) };
   const destination = { getLastRow: () => output.length, appendRow: row => output.push(row), getRange: () => ({ setValues: () => {}, getDisplayValues: () => [] }) };
   const spreadsheet = { getSheetByName: name => name === 'CP- SABE ' ? source : destination };
   const sandbox = {
@@ -50,7 +58,7 @@ function fixture() {
   };
   vm.createContext(sandbox); vm.runInContext(fs.readFileSync(path.join(root, 'google-apps-script/Code.gs'), 'utf8'), sandbox);
   const post = data => sandbox.doPost({ postData: { contents: JSON.stringify({ chave: 'test-secret', ...data }) } });
-  return { post, output };
+  return { post, output, rows };
 }
 
 const env = { SABE_SHEETS_WEBHOOK_URL: 'https://example.test/exec', SABE_WEBHOOK_SECRET: 'test-secret' };
@@ -84,6 +92,23 @@ test('CP validar: consulta, confere e grava os dados da planilha (nao os do nave
   assert.equal(h.f.output[1][5], 'Pessoa Teste');   // NOME vem da planilha
   assert.equal(h.f.output[1][8], '52998224725');    // CPF vem da planilha
   assert.equal(h.f.output[1][2], 'validar');
+  // A propria aba oficial fica marcada como validada.
+  assert.equal(h.f.rows[1][19], '✓');
+  assert.ok(h.f.rows[1][18], 'ATUALIZADO deve receber a data/hora');
+  assert.equal(h.f.rows[1][4], 'Pessoa Teste'); // validar nao troca os dados
+});
+
+test('CP validados: a lista de polos vem da coluna VALIDADO/ALTERADO FORM da CP- SABE', async () => {
+  const f = fixture();
+  const fetchStub = async (_url, options = {}) => Response.json(f.post(JSON.parse(options.body)));
+  const lookup = load('src/app/api/indicacoes/route.ts', env, fetchStub);
+  const submit = load('src/app/api/inscricoes/route.ts', env, fetchStub);
+  const current = await (await lookup.POST(request('/api/indicacoes', { nte: 'NTE 18', polo: 'ALAGOINHAS 01' }))).json();
+  await submit.POST(request('/api/inscricoes', { modalidade: 'CP', acao: 'validar', nte: 'NTE 18', local: 'ALAGOINHAS 01', registro: current.registro, versao: current.versao }));
+  const { GET } = load('src/app/api/validacao-status/route.ts', env, fetchStub);
+  const response = await GET(new Request(origin + '/api/validacao-status?nte=' + encodeURIComponent('NTE 18') + '&mode=cp'));
+  const body = await response.json();
+  assert.ok(body.validated.includes('ALAGOINHAS 01'), JSON.stringify(body));
 });
 
 test('CP editar: exige nome/cpf, envia adicionais e preserva o vinculo do registro', async () => {
@@ -102,6 +127,10 @@ test('CP editar: exige nome/cpf, envia adicionais e preserva o vinculo do regist
   assert.equal(h.f.output[1][2], 'editar');
   assert.equal(h.f.output[1][5], 'Pessoa Teste Editada');
   assert.equal(h.f.output[1][13], current.registro); // REGISTRO ORIGINAL preservado
+  // CP- SABE recebe os dados corrigidos in loco.
+  assert.equal(h.f.rows[1][4], 'Pessoa Teste Editada');
+  assert.equal(h.f.rows[1][14], '9999');
+  assert.equal(h.f.rows[1][19], '✓');
 });
 
 test('CP editar: adicionais divergentes sao recusados', async () => {
@@ -131,6 +160,11 @@ test('CP alterar: troca de pessoa grava os dados informados com CPF diferente', 
   assert.equal(h.f.output[1][2], 'alterar');
   assert.equal(h.f.output[1][5], 'Nova Pessoa');
   assert.equal(h.f.output[1][8], '111.444.777-35');
+  // CP- SABE passa a refletir a pessoa substituta.
+  assert.equal(h.f.rows[1][4], 'Nova Pessoa');
+  assert.equal(h.f.rows[1][7], '111.444.777-35');
+  assert.equal(h.f.rows[1][11], '001 BANCO');
+  assert.equal(h.f.rows[1][19], '✓');
 });
 
 test('CP alterar: mesmo CPF e recusado (deve usar Editar Dados)', async () => {
@@ -145,6 +179,7 @@ test('CP alterar: mesmo CPF e recusado (deve usar Editar Dados)', async () => {
   }));
   assert.equal(response.status, 400);
   assert.equal(h.f.output.length, 0);
+  assert.equal(h.f.rows[1][19], ''); // nada marcado na CP- SABE
 });
 
 test('CP validar: versao desatualizada e recusada (CONFLICT)', async () => {
