@@ -116,7 +116,10 @@ test('CP validados: a lista de polos vem da coluna VALIDADO/ALTERADO FORM da CP-
   const { GET } = load('src/app/api/validacao-status/route.ts', env, fetchStub);
   const response = await GET(new Request(origin + '/api/validacao-status?nte=' + encodeURIComponent('NTE 18') + '&mode=cp'));
   const body = await response.json();
-  assert.ok(body.validated.includes('ALAGOINHAS 01'), JSON.stringify(body));
+  assert.ok(body.validated.some(item => item.nte === '18' && item.polo === 'ALAGOINHAS 01'), JSON.stringify(body));
+  // Sem ?nte (pre-carregamento da pagina) devolve todos os validados.
+  const tudo = await (await GET(new Request(origin + '/api/validacao-status?mode=cp'))).json();
+  assert.ok(tudo.validated.some(item => item.polo === 'ALAGOINHAS 01'), JSON.stringify(tudo));
 });
 
 test('CP editar: exige nome/cpf, envia adicionais e preserva o vinculo do registro', async () => {

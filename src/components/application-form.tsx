@@ -46,6 +46,10 @@ function normalized(value: string) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+// Chave NTE+polo para casar com a lista pre-carregada de polos ja validados.
+const nteKey = (value: string) => String(Number(String(value || "").replace(/\D/g, "")));
+const placeKey = (nte: string, polo: string) => `${nteKey(nte)}|${normalized(polo)}`;
+
 function extractDigito(value: string): { principal: string; digito: string } {
   if (!value) return { principal: "", digito: "" };
   const partes = String(value).split(/[-–]/);
@@ -108,7 +112,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [bankSearch, setBankSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadingCandidate, setLoadingCandidate] = useState(false);
-  const [loadingValidated, setLoadingValidated] = useState(false);
+  const [loadingValidated, setLoadingValidated] = useState(isCp);
   const busy = useRef(false);
   const [edited, setEdited] = useState(false);
   const [additional, setAdditional] = useState<Coordinator["adicionais"]>([]);
@@ -125,30 +129,37 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   );
 
   useEffect(() => {
-    let ativo = true;
+    if (!isCp) return;
     const controller = new AbortController();
-    async function fetchValidatedPlaces() {
-      if (!nte || !isCp) {
-        setValidatedPlaces([]);
-        return;
-      }
-      setLoadingValidated(true);
+    let ativo = true;
+    async function loadValidatedPlaces() {
+      // Pre-carrega TODOS os polos validados de uma vez, antes de o usuario escolher o NTE.
       try {
-        const response = await fetch(`/api/validacao-status?nte=${encodeURIComponent(nte)}&mode=${mode}`, {
+        const response = await fetch(`/api/validacao-status?mode=${mode}`, {
           cache: "no-store",
           signal: controller.signal,
         });
         const result = await safeJson(response);
-        if (ativo) setValidatedPlaces(Array.isArray(result.validated) ? result.validated : []);
+        if (!ativo) return;
+        const items = Array.isArray(result.validated) ? result.validated : [];
+        setValidatedPlaces(items
+          .map((item) => {
+            if (item && typeof item === "object") {
+              const entry = item as { nte?: unknown; polo?: unknown };
+              if (typeof entry.polo === "string") return placeKey(String(entry.nte ?? ""), entry.polo);
+            }
+            return "";
+          })
+          .filter(Boolean));
       } catch {
         if (ativo) setValidatedPlaces([]);
       } finally {
         if (ativo) setLoadingValidated(false);
       }
     }
-    fetchValidatedPlaces();
+    loadValidatedPlaces();
     return () => { ativo = false; controller.abort(); };
-  }, [nte, isCp, mode]);
+  }, [isCp, mode]);
 
   const places = useMemo(() => {
     if (!nte) return [];
@@ -157,7 +168,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     );
     return placesList.map(p => ({
       name: p,
-      isDisabled: validatedPlaces.includes(normalized(p))
+      isDisabled: validatedPlaces.includes(placeKey(nte, p))
     }));
   }, [isCp, nte, validatedPlaces]);
 
@@ -180,7 +191,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setMessage("");
     if (!nte || !place || busy.current) return;
 
-    if (validatedPlaces.includes(normalized(place))) {
+    if (validatedPlaces.includes(placeKey(nte, place))) {
       setMessage("Este polo já foi validado e não está mais disponível para alteração.");
       return;
     }
@@ -375,11 +386,14 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
       <section className="form-shell" aria-live="polite">
         {stage === "selection" && (
-          <form onSubmit={selectLocation} aria-busy={loadingCandidate}>
+          <form onSubmit={selectLocation} aria-busy={loadingCandidate || loadingValidated}>
             <div className="section-heading"><span>01</span><div><h2>Identifique o local</h2><p>As opções seguem a relação oficial da planilha SABE 2026.</p></div></div>
+            {loadingValidated && (
+              <p className="loading-line" role="status"><span className="spinner" aria-hidden="true" />Carregando os dados dos polos…</p>
+            )}
             <div className="field-grid">
               <label>NTE
-                <select disabled={loadingCandidate} value={nte} onChange={(event) => { setNte(event.target.value); setPlace(""); setMessage(""); }} required>
+                <select disabled={loadingCandidate || loadingValidated} value={nte} onChange={(event) => { setNte(event.target.value); setPlace(""); setMessage(""); }} required>
                   <option value="">Selecione o NTE</option>
                   {ntes.map((item) => <option key={item}>{item}</option>)}
                 </select>
@@ -388,7 +402,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <select
                   value={place}
                   onChange={(event) => { setPlace(event.target.value); setMessage(""); }}
-                  disabled={!nte || loadingCandidate}
+                  disabled={!nte || loadingCandidate || loadingValidated}
                   required
                 >
                   <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
@@ -401,9 +415,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               </label>
             </div>
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
-            {loadingValidated && <p role="status">Verificando polos já validados…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
+            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate || loadingValidated}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
           </form>
         )}
 

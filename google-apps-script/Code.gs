@@ -148,8 +148,8 @@ function validatedPolos(spreadsheet, nte) {
   const poloColumn = cp.map.polo >= 0 ? cp.map.polo : 2;
   const rows = cp.sheet.getRange(2, 1, cp.sheet.getLastRow() - 1, cp.columns).getDisplayValues();
   return rows
-    .filter(row => nteNumber(row[nteColumn]) === nteNumber(nte) && String(row[cp.map.validado] || "").trim())
-    .map(row => normalized(row[poloColumn]));
+    .filter(row => String(row[cp.map.validado] || "").trim() && (!nte || nteNumber(row[nteColumn]) === nteNumber(nte)))
+    .map(row => ({ nte: nteNumber(row[nteColumn]), polo: normalized(row[poloColumn]) }));
 }
 function validAdicionais(adicionais, current) {
   return Array.isArray(adicionais) && adicionais.length === current.length &&
@@ -272,7 +272,6 @@ function doPost(event) {
   }
   if (data.tipo === "status") return response({ ok: true, versao: CODE_VERSION });
   if (data.tipo === "validados") {
-    if (!data.nte) return response({ ok: false, code: "INVALID" });
     return response({ ok: true, versao: CODE_VERSION, validated: validatedPolos(spreadsheet, data.nte) });
   }
   const cp = data.modalidade === "CP";
