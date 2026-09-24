@@ -96,7 +96,7 @@ function friendlyError(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function ApplicationForm({ mode, testMode = false }: { mode: Mode; testMode?: boolean }) {
+export function ApplicationForm({ mode }: { mode: Mode }) {
   const isCp = mode === "cp";
   const [stage, setStage] = useState<Stage>("selection");
   const [nte, setNte] = useState("");
@@ -328,11 +328,6 @@ export function ApplicationForm({ mode, testMode = false }: { mode: Mode; testMo
 
   return (
     <main className="form-page">
-      {testMode && (
-        <p className="notice" role="status">
-          <strong>Página de testes.</strong> Este formulário grava na planilha real. Use com cautela.
-        </p>
-      )}
       <section className="form-intro">
         <h1>{isCp ? "Validação dos Coordenadores de Polo" : "Supervisor Municipal"}</h1>
         <div className="intro-copy">
