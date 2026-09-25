@@ -20,9 +20,15 @@ export async function uploadDocumento(
 ) {
   if (!supabase) throw new Error("Supabase não configurado.");
   const bucket = "sabe2026-documentos";
+  /* O Supabase Storage rejeita chaves com acentos ("Invalid key"). Normaliza o nome
+     do arquivo: tira acentos (NFD), remove símbolos e espaços, e garante só ASCII seguro. */
   const safeNome = String(arquivo.name || "documento.pdf")
-    .replace(/[\\/:*?"<>|]/g, "-")
-    .replace(/\s+/g, "_");
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\\/:*?"<>|\s]/g, "_")
+    .replace(/[^A-Za-z0-9.\-_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/\.pdf$/i, ".pdf") || "documento.pdf";
   const timestamp = Date.now();
   const safeMunicipio = String(municipio || "SEM_MUNICIPIO")
     .normalize("NFD")
