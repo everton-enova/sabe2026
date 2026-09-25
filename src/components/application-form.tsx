@@ -397,7 +397,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
       const result = await safeJson(response);
       if (!response.ok || result.ok === false) {
-        throw new Error(result.message || result.error || "Não foi possível concluir o envio.");
+        const detail = result.detalhe ? ` (${result.detalhe})` : "";
+        throw new Error((result.message || result.error || "Não foi possível concluir o envio.") + detail);
       }
       setStage("success");
       // O polo recém-validado já entra na lista, para aparecer marcado se voltar.
@@ -446,7 +447,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <li>Selecione o município.</li>
                 <li>Confira os dados apresentados dos Coordenadores de Polo que atuaram no SABE 2025 e verifique se permanecem para o SABE 2026.</li>
                 <li>Caso as informações estejam corretas, realize a validação.</li>
-                <li>Caso seja necessária a substituição do Coordenador de Polo, selecione a opção “Alterar Coordenador de Polo” e informe os dados da nova pessoa indicada.</li>
+                <li>Caso seja necessária a substituição do Coordenador de Polo, selecione a opção "Alterar Coordenador de Polo" e informe os dados da nova pessoa indicada.</li>
               </ol>
               <p><strong>Confira todas as informações antes de concluir o formulário.</strong></p>
             </>
@@ -463,12 +464,16 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <li>Anexe o ofício ou o e-mail da Secretaria Municipal de Educação, que confirma a indicação do Supervisor Municipal.</li>
                 <li>Revise cuidadosamente todas as informações antes de finalizar e enviar o formulário.</li>
               </ol>
-              <div className="section-spacer" />
-              <p><strong>⚠️ ATENÇÃO: Confira todas as informações antes de concluir o formulário! A conferência dos dados é fundamental para assegurar a regularidade do cadastro, a comunicação com os profissionais indicados e a organização das atividades de aplicação do SABE 2026.</strong></p>
               <p>Agradecemos a colaboração e o comprometimento de todos/as.</p>
             </>
           )}
         </div>
+        {!isCp && (
+          <div className="attention-block">
+            <div className="section-spacer" />
+            <p><strong>⚠️ ATENÇÃO: Confira todas as informações antes de concluir o formulário! A conferência dos dados é fundamental para assegurar a regularidade do cadastro, a comunicação com os profissionais indicados e a organização das atividades de aplicação do SABE 2026.</strong></p>
+          </div>
+        )}
       </section>
 
       {stage !== "success" && (
@@ -725,6 +730,15 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido e processado com sucesso.</p><div className="form-actions"><button type="button" className="button primary" onClick={resetSelection}>Fazer novo cadastro <span>→</span></button></div></div>
         )}
       </section>
+
+      {submitting && (
+        <div className="loading-overlay" role="status" aria-live="polite">
+          <div className="loading-overlay-box">
+            <span className="spinner" aria-hidden="true" />
+            <p>Enviando…</p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
