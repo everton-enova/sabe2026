@@ -126,14 +126,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [arquivoErro, setArquivoErro] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Caixa do formulário: o scroll das etapas leva até aqui (e não até o topo,
-  // que escondia a seleção e obrigava a rolar de novo).
-  const formShellRef = useRef<HTMLElement | null>(null);
-  const scrollToForm = () => {
-    requestAnimationFrame(() => {
-      formShellRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  };
   const needsBotCheck = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
   const [validatedPlaces, setValidatedPlaces] = useState<string[]>([]);
   const [nteValidated, setNteValidated] = useState<string[]>([]);
@@ -272,7 +264,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
         setCoordinator(result as unknown as Coordinator);
         setStage("candidate");
-        scrollToForm();
       } catch (error) {
         setMessage(friendlyError(error, "Não foi possível localizar a indicação."));
       } finally {
@@ -281,7 +272,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
     } else {
       setStage("form");
-      scrollToForm();
     }
   }
 
@@ -314,14 +304,12 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setAccepted(false);
     setMessage("");
     setStage(newAction === "validar" ? "conference" : "form");
-    scrollToForm();
   }
 
   function editCurrent() {
     setAction("editar");
     setAccepted(false);
     setStage("form");
-    scrollToForm();
   }
 
   function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -369,7 +357,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setAccepted(false);
     if (isCp && action === "editar") { setEdited(true); setStage("conference"); }
     else setStage("review");
-    scrollToForm();
   }
 
   async function submit() {
@@ -417,7 +404,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         throw new Error((result.message || result.error || "Não foi possível concluir o envio.") + detail);
       }
       setStage("success");
-      scrollToForm();
       // O polo/município recém-validado já entra na lista, para aparecer marcado se voltar.
       setValidatedPlaces(prev => prev.includes(placeKey(nte, place)) ? prev : [...prev, placeKey(nte, place)]);
     } catch (error) {
@@ -433,7 +419,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   function resetSelection() {
     setStage("selection");
-    scrollToForm();
     setEdited(false);
     setAction(isCp ? "validar" : "cadastrar");
     setPlace("");
@@ -504,7 +489,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         </ol>
       )}
 
-      <section ref={formShellRef} className="form-shell" aria-live="polite">
+      <section className="form-shell" aria-live="polite">
         {stage === "selection" && (
           <form onSubmit={selectLocation} aria-busy={loadingCandidate || loadingValidated}>
             <div className="section-heading"><span>01</span><div><h2>Identifique o local</h2><p>As opções seguem a relação oficial da planilha SABE 2026.</p></div></div>
@@ -575,7 +560,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="form-actions split"><button type="button" className="button secondary" onClick={() => setStage("candidate")}>Voltar</button><div className="action-group"><button type="button" className="button secondary" onClick={editCurrent}>Editar Dados</button>{action === "validar" ? (
               <button type="button" className="button primary" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken)} onClick={submit}>Validar Indicação</button>
             ) : (
-              <button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); scrollToForm(); }}>Revisar e enviar</button>
+              <button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); }}>Revisar e enviar</button>
             )}</div></div>
           </div>
         )}
