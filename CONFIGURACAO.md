@@ -107,14 +107,41 @@ não esperadas. As causas reais que já aparecem no projeto:
 ### Upload do Supervisor Municipal (SM) falha com “Bucket not found”
 
 O PDF do SM sobe para o **Supabase Storage** no bucket `sabe2026-documentos`. Se o bucket não
-existir no projeto (ver `scripts/diagnostico.mjs`), crie no painel:
+existir no projeto (ver `scripts/diagnostico.mjs`), crie com um clique:
 
-1. **Supabase → Storage → New bucket**
-2. Nome: `sabe2026-documentos`
-3. Marque **Public bucket** (a URL pública vai para o Google Sheets)
-4. Em **Storage → Policies**, adicione `INSERT` com acesso anônimo (a autenticação é feita pela
-   chave anon no cliente/publicado; o servidor usa `SUPABASE_SERVICE_ROLE_KEY`, que ignora RLS
-   — só precisa existir no painel Vercel).
+1. Abra o **Supabase Dashboard** do projeto e vá em **SQL Editor**.
+2. Cole o conteúdo de `supabase-setup.sql` e clique **Run**.
+
+O script cria o bucket público `sabe2026-documentos` (4 MB, só PDF) e as policies de INSERT/SELECT
+anônimo — necessário porque o app usa a publishable key quando a service role não está presente.
+São idempotentes: pode rodar de novo sem risco.
 
 Depois cadastre `SUPABASE_SERVICE_ROLE_KEY` na Vercel (Produção/Prévia/Desenvolvimento) e faça
 **Redeploy**. Localmente, coloque-a no `.env`.
+
+## 7. Corrigir as variáveis da Vercel de uma vez (recomendado)
+
+O erro `UNAUTHORIZED` no `/api/versao` significa que `SABE_WEBHOOK_SECRET`/`SABE_SHEETS_WEBHOOK_URL`
+no painel da Vercel estão desatualizados (o `.env` local funciona). Em vez de trocar variável por
+variável à mão, rode o script pronto:
+
+```bash
+npm i -g vercel
+vercel login       # abre o navegador com sua conta
+bash scripts/setup-vercel-env.sh
+```
+
+Ele copia **todas** as variáveis do `.env` local para Produção, Prévia e Desenvolvimento na Vercel
+(sobrescrevendo as antigas, pulando as que estão vazias) e dispara o redeploy de produção.
+
+Confirme no final:
+
+```
+https://sabe2026.vercel.app/api/versao
+```
+
+- `{ "ok": true, "versao": "2026-09-25-..." }` → pronto.
+- `{ "ok": false, "code": "UNAUTHORIZED" }` → o `.env` local também está com segredo errado
+  (confira as propriedades do script no Apps Script).
+- `{ "ok": false, "code": "INVALID" }` → o Apps Script publicado é antigo; publique nova versão
+  do `Code.gs` (seção 1).
