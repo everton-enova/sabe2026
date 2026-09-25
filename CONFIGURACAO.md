@@ -77,3 +77,44 @@ No editor do Apps Script, escolha no topo a função **`removerAbasSaida`** e cl
 - Verificação anti-bot fica desativada enquanto `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` não estiverem configuradas.
 
 As variáveis de planilha são necessárias para gravar os envios em produção.
+
+## 6. Diagnóstico rápido e erros conhecidos
+
+Rode em qualquer ambiente (local ou CI) com as variáveis carregadas:
+
+```bash
+node scripts/diagnostico.mjs
+```
+
+Isso testa, na ordem: variáveis, webhook GAS, fallback público da planilha e Supabase Storage.
+
+### “Não foi possível consultar os dados deste polo.” (erro genérico 502)
+
+A mensagem é o fallback de erro da API (`failure()` em `src/lib/api-security.ts`) para exceções
+não esperadas. As causas reais que já aparecem no projeto:
+
+1. **`SABE_WEBHOOK_SECRET` errado/desatualizado na Vercel** — o Apps Script responde
+   `UNAUTHORIZED` para todo POST. Sintoma: `/api/versao` responde `{ code: "UNAUTHORIZED" }`
+   ou `DESATUALIZADO`. Correção: no painel **Vercel → Settings → Environment Variables**,
+   apague `SABE_WEBHOOK_SECRET` e `SABE_SHEETS_WEBHOOK_URL` (Produção, Prévia, Desenvolvimento),
+   cadastre os valores que funcionam localmente (confira o `.env`) e faça **Redeploy**.
+2. **Google Sheets público lento/indisponível** — quando o webhook falha, a consulta cai na
+   leitura pública (gviz). Com retry e timeout de 25s (versão atual) ela resiste melhor; se
+   ainda assim falhar, a resposta mostra a causa em `detalhe` na tela.
+3. **Assinatura/tempo** — o formulário espera a resposta em JSON; um proxy ou firewall pode
+   devolver HTML e o erro aparece como “resposta inválida”.
+
+### Upload do Supervisor Municipal (SM) falha com “Bucket not found”
+
+O PDF do SM sobe para o **Supabase Storage** no bucket `sabe2026-documentos`. Se o bucket não
+existir no projeto (ver `scripts/diagnostico.mjs`), crie no painel:
+
+1. **Supabase → Storage → New bucket**
+2. Nome: `sabe2026-documentos`
+3. Marque **Public bucket** (a URL pública vai para o Google Sheets)
+4. Em **Storage → Policies**, adicione `INSERT` com acesso anônimo (a autenticação é feita pela
+   chave anon no cliente/publicado; o servidor usa `SUPABASE_SERVICE_ROLE_KEY`, que ignora RLS
+   — só precisa existir no painel Vercel).
+
+Depois cadastre `SUPABASE_SERVICE_ROLE_KEY` na Vercel (Produção/Prévia/Desenvolvimento) e faça
+**Redeploy**. Localmente, coloque-a no `.env`.
