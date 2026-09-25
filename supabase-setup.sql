@@ -1,13 +1,15 @@
 -- ============================================================
--- SABE 2026 — Setup do Supabase Storage (rodar UMA vez no SQL Editor)
+-- SABE 2026 — Setup do Supabase Storage
 -- Supabase Dashboard -> SQL Editor -> New query -> colar -> Run
 --
 -- Cria o bucket público 'sabe2026-documentos' e as policies de
 -- acesso anônimo necessárias para o upload dos PDFs do SM.
--- É idempotente: pode rodar quantas vezes quiser.
+-- É 100% idempotente: pode rodar quantas vezes quiser, sem erro.
+-- (Se já rodou antes e deu "policy already exists", é porque o bucket
+--  e as policies JÁ estão corretos — pode rodar de novo sem medo.)
 -- ============================================================
 
--- 1) Cria o bucket público com limite de 4 MB e só PDF
+-- 1) Cria o bucket público com limite de 4 MB e só PDF (idempotente)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'sabe2026-documentos',
@@ -24,7 +26,8 @@ on conflict (id) do update set
 -- 2) Policy de INSERT anônimo — o upload é feito pelo servidor da Vercel
 --    com SUPABASE_SERVICE_ROLE_KEY (ignora RLS), mas se a service role
 --    não estiver configurada o app cai na publishable key (anon), que
---    precisa desta policy.
+--    precisa desta policy. (drop primeiro evita o erro 42710 na re-execução)
+drop policy if exists "sabe2026-documentos anon insert" on storage.objects;
 create policy "sabe2026-documentos anon insert"
 on storage.objects for insert
 to anon
@@ -32,6 +35,7 @@ with check (bucket_id = 'sabe2026-documentos');
 
 -- 3) Policy de SELECT anônimo — permite ler a URL pública (necessária
 --    para o Apps Script exibir o link do documento).
+drop policy if exists "sabe2026-documentos anon select" on storage.objects;
 create policy "sabe2026-documentos anon select"
 on storage.objects for select
 to anon
