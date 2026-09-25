@@ -545,7 +545,17 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               {Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details] || key}</dt><dd>{value || "Não informado"}</dd></div>)}
             </dl>
             {edited && <p role="status" className="notice">Correções preparadas. Confira os dados e valide para concluir o envio.</p>}
-            <div className="form-actions split"><button type="button" className="button secondary" onClick={() => setStage("candidate")}>Voltar</button><div className="action-group"><button type="button" className="button secondary" onClick={editCurrent}>Editar Dados</button><button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); }}>Validar Indicação</button></div></div>
+            {action === "validar" && (
+              <>
+                <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio.</span></label>
+                {needsBotCheck && <BotCheck key={botAttempt} action="sabe-envio" onToken={setTurnstileToken} />}
+              </>
+            )}
+            <div className="form-actions split"><button type="button" className="button secondary" onClick={() => setStage("candidate")}>Voltar</button><div className="action-group"><button type="button" className="button secondary" onClick={editCurrent}>Editar Dados</button>{action === "validar" ? (
+              <button type="button" className="button primary" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken)} onClick={submit}>Validar Indicação</button>
+            ) : (
+              <button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); }}>Revisar e enviar</button>
+            )}</div></div>
           </div>
         )}
 

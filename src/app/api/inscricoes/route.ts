@@ -1,10 +1,16 @@
 import { ApiError, failure, json, readRequest } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { bucketEnabled, uploadDocumento } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/* Se o Supabase Storage estiver configurado, o PDF do SM sobe para lá
+   e apenas a URL publica vai para o Apps Script. Isso elimina o gargalo
+   do base64 -> Google Drive, que estourava o timeout. */
+const USE_SUPABASE_STORAGE = true;
 
 type Submission = Record<string, unknown>;
 
@@ -115,11 +121,23 @@ export async function POST(request: Request) {
     }
     // Validation uses the source record, never identity/details supplied by the browser.
     if (cp && payload.acao === "validar") for (const field of [...requiredDetails, ...extraDetails]) delete submission[field];
-    // O anexo do SM nao passa pelo limite de 500 chars nem entra na lista de campos comuns.
+    // O anexo do SM sobe para o Supabase Storage (rapido) e apenas a URL
+    // publica vai para o Apps Script, que grava na planilha.
     if (payload.modalidade === "SM") {
-      submission.arquivoNome = arquivoNome.slice(0, 200);
-      submission.arquivoTipo = arquivoTipo;
-      submission.arquivoBase64 = arquivoBase64;
+      if (USE_SUPABASE_STORAGE && bucketEnabled()) {
+        const buffer = Buffer.from(arquivoBase64, "base64");
+        const documentoUrl = await uploadDocumento(
+          { name: arquivoNome, type: arquivoTipo, buffer },
+          String(payload.nte),
+          String(payload.local)
+        );
+        submission.documentoUrl = documentoUrl;
+      } else {
+        // Fallback: envia base64 para o Apps Script salvar no Drive.
+        submission.arquivoNome = arquivoNome.slice(0, 200);
+        submission.arquivoTipo = arquivoTipo;
+        submission.arquivoBase64 = arquivoBase64;
+      }
     }
     await sheets({ ...submission, enviadoEm: new Date().toISOString() });
     return json({ ok: true });

@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 /* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
-const CODE_VERSION = "2026-09-25-diagnostico";
+const CODE_VERSION = "2026-09-25-supabase";
 const MIGRACAO_FLAG = "MIGRACAO_INSCRICOES_CP";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
@@ -348,13 +348,17 @@ function doPost(event) {
     const offset = rows.findIndex(row => nteNumber(row[nteColumn]) === nteNumber(data.nte) && normalized(row[municipioColumn]) === normalized(data.local));
     if (offset < 0) return response({ ok: false, code: "NOT_FOUND" });
     if (sm.map.validado >= 0 && String(rows[offset][sm.map.validado] || "").trim()) return response({ ok: false, code: "DUPLICATE" });
-    // Grava o anexo antes de marcar a linha: se o Drive falhar, nada e validado.
-    const documento = salvarDocumentoSm(data);
-    if (documento && documento.falha) {
-      return response({ ok: false, code: "UPLOAD_FAILED", error: documento.motivo });
+    // Documento vem do Supabase Storage (URL publica) ou do fallback base64 -> Drive.
+    if (data.documentoUrl) {
+      data.documento = data.documentoUrl;
+    } else {
+      const documento = salvarDocumentoSm(data);
+      if (documento && documento.falha) {
+        return response({ ok: false, code: "UPLOAD_FAILED", error: documento.motivo });
+      }
+      if (!documento || !documento.url) return response({ ok: false, code: "UPLOAD_FAILED", error: "retorno vazio do salvarDocumentoSm" });
+      data.documento = documento.url;
     }
-    if (!documento || !documento.url) return response({ ok: false, code: "UPLOAD_FAILED", error: "retorno vazio do salvarDocumentoSm" });
-    data.documento = documento.url;
     updateSmRow(spreadsheet, sm, offset + 2, data);
     return response({ ok: true });
   } catch (error) {
