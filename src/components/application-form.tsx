@@ -126,6 +126,14 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [arquivoErro, setArquivoErro] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Caixa do formulário: o scroll das etapas leva até aqui (e não até o topo,
+  // que escondia a seleção e obrigava a rolar de novo).
+  const formShellRef = useRef<HTMLElement | null>(null);
+  const scrollToForm = () => {
+    requestAnimationFrame(() => {
+      formShellRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
   const needsBotCheck = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
   const [validatedPlaces, setValidatedPlaces] = useState<string[]>([]);
   const [nteValidated, setNteValidated] = useState<string[]>([]);
@@ -138,11 +146,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   );
 
   useEffect(() => {
-    if (!isCp) return;
     const controller = new AbortController();
     let ativo = true;
     async function loadValidatedPlaces() {
-      // Pre-carrega TODOS os polos validados de uma vez, antes de o usuario escolher o NTE.
+      // Pre-carrega TODOS os polos/municipios validados de uma vez, antes de escolher o local.
       try {
         const response = await fetch(`/api/validacao-status?mode=${mode}`, {
           cache: "no-store",
@@ -158,8 +165,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         setValidatedPlaces(antigo ? [] : items
           .map((item) => {
             if (item && typeof item === "object") {
-              const entry = item as { nte?: unknown; polo?: unknown };
-              if (typeof entry.polo === "string") return placeKey(String(entry.nte ?? ""), entry.polo);
+              const entry = item as { nte?: unknown; polo?: unknown; municipio?: unknown };
+              // CP devolve {polo}; SM devolve {municipio}. Ambos casam com placeKey(nte, local).
+              const local = typeof entry.polo === "string" ? entry.polo : typeof entry.municipio === "string" ? entry.municipio : "";
+              if (local) return placeKey(String(entry.nte ?? ""), local);
             }
             return "";
           })
@@ -263,6 +272,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
         setCoordinator(result as unknown as Coordinator);
         setStage("candidate");
+        scrollToForm();
       } catch (error) {
         setMessage(friendlyError(error, "Não foi possível localizar a indicação."));
       } finally {
@@ -271,6 +281,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
     } else {
       setStage("form");
+      scrollToForm();
     }
   }
 
@@ -303,12 +314,14 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setAccepted(false);
     setMessage("");
     setStage(newAction === "validar" ? "conference" : "form");
+    scrollToForm();
   }
 
   function editCurrent() {
     setAction("editar");
     setAccepted(false);
     setStage("form");
+    scrollToForm();
   }
 
   function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -356,7 +369,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setAccepted(false);
     if (isCp && action === "editar") { setEdited(true); setStage("conference"); }
     else setStage("review");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollToForm();
   }
 
   async function submit() {
@@ -404,8 +417,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         throw new Error((result.message || result.error || "Não foi possível concluir o envio.") + detail);
       }
       setStage("success");
-      // O polo recém-validado já entra na lista, para aparecer marcado se voltar.
-      if (isCp) setValidatedPlaces(prev => prev.includes(placeKey(nte, place)) ? prev : [...prev, placeKey(nte, place)]);
+      scrollToForm();
+      // O polo/município recém-validado já entra na lista, para aparecer marcado se voltar.
+      setValidatedPlaces(prev => prev.includes(placeKey(nte, place)) ? prev : [...prev, placeKey(nte, place)]);
     } catch (error) {
       // Token do Turnstile e de uso unico: descarta e remonta o widget para o proximo envio.
       setTurnstileToken("");
@@ -419,6 +433,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   function resetSelection() {
     setStage("selection");
+    scrollToForm();
     setEdited(false);
     setAction(isCp ? "validar" : "cadastrar");
     setPlace("");
@@ -489,7 +504,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         </ol>
       )}
 
-      <section className="form-shell" aria-live="polite">
+      <section ref={formShellRef} className="form-shell" aria-live="polite">
         {stage === "selection" && (
           <form onSubmit={selectLocation} aria-busy={loadingCandidate || loadingValidated}>
             <div className="section-heading"><span>01</span><div><h2>Identifique o local</h2><p>As opções seguem a relação oficial da planilha SABE 2026.</p></div></div>
@@ -513,12 +528,15 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                   <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
                   {places.map((item) => (
                     <option key={item.name} value={item.name} disabled={item.isDisabled}>
-                      {item.name}{item.isDisabled ? " ✓" : ""}
+                      {item.name}{item.isDisabled ? (isCp ? " — já validado ✓" : " — já cadastrado ✓") : ""}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
+            {places.length > 0 && places.every((item) => item.isDisabled) && (
+              <p className="form-message error" role="status">{isCp ? "Todos os polos deste NTE já foram validados." : "Todos os municípios deste NTE já foram cadastrados."}</p>
+            )}
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}
             <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate || loadingValidated}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
@@ -557,7 +575,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="form-actions split"><button type="button" className="button secondary" onClick={() => setStage("candidate")}>Voltar</button><div className="action-group"><button type="button" className="button secondary" onClick={editCurrent}>Editar Dados</button>{action === "validar" ? (
               <button type="button" className="button primary" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken)} onClick={submit}>Validar Indicação</button>
             ) : (
-              <button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); }}>Revisar e enviar</button>
+              <button type="button" className="button primary" onClick={() => { setAccepted(false); setStage("review"); scrollToForm(); }}>Revisar e enviar</button>
             )}</div></div>
           </div>
         )}
