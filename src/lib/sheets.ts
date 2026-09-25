@@ -76,8 +76,11 @@ export async function sheets(payload: Record<string, unknown>) {
     response = await fetch(url, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store",
-      // O upload do PDF para o Drive leva bem mais que uma gravacao simples.
-      signal: AbortSignal.timeout(typeof payload.arquivoBase64 === "string" && payload.arquivoBase64 ? 55000 : 15000),
+      // Sem base64 (Supabase Storage) o Apps Script so grava na planilha: 15s.
+      // Com base64 fallback (Drive) precisa de mais tempo: 55s.
+      signal: AbortSignal.timeout(
+        (typeof payload.arquivoBase64 === "string" && payload.arquivoBase64) ? 55000 : 15000
+      ),
     });
   } catch (error) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
