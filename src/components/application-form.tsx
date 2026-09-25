@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState, useEffect } from "react";
+import { ChangeEvent, FormEvent, useMemo, useRef, useState, useEffect } from "react";
 import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
 import { BotCheck } from "@/components/bot-check";
@@ -86,6 +86,9 @@ async function safeJson(res: Response): Promise<ServerResponse> {
    estoura e a tela mostra "erro" em vez de tentar de novo. 45s cobre a leitura de 15s
    do webhook + o fallback público de 15s em lib/sheets.ts, com folga. */
 const REQUEST_TIMEOUT = 45000;
+// Upload do PDF vai e volta pelo Apps Script: precisa de mais folga que o JSON.
+const REQUEST_TIMEOUT_UPLOAD = 90000;
+const MAX_PDF_BYTES = 4 * 1024 * 1024;
 function timeoutSignal(ms: number) {
   if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) return AbortSignal.timeout(ms);
   const controller = new AbortController();
@@ -120,6 +123,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [message, setMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [botAttempt, setBotAttempt] = useState(0);
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [arquivoErro, setArquivoErro] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const needsBotCheck = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
   const [validatedPlaces, setValidatedPlaces] = useState<string[]>([]);
   const [nteValidated, setNteValidated] = useState<string[]>([]);
@@ -302,9 +308,32 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setStage("form");
   }
 
+  function handleFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] || null;
+    setArquivoErro("");
+    if (!file) { setArquivo(null); return; }
+    if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) {
+      setArquivo(null);
+      setArquivoErro("O documento deve estar em formato PDF.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      setArquivo(null);
+      setArquivoErro("O arquivo deve ter no máximo 4 MB.");
+      event.target.value = "";
+      return;
+    }
+    setArquivo(file);
+  }
+
   function reviewForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    if (!isCp && !arquivo) {
+      setMessage("Anexe o ofício ou o e-mail da Secretaria em PDF antes de revisar os dados.");
+      return;
+    }
     if ((action !== "editar" || details.banco.trim()) && (!bankChoice || (bankChoice === "__outro__" && !details.banco.trim()))) {
       setMessage("Selecione um banco da lista ou use a opção para digitar outro banco.");
       return;
@@ -333,21 +362,39 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setSubmitting(true);
     setMessage("");
     try {
-      const response = await fetch("/api/inscricoes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modalidade: mode.toUpperCase(),
-          acao: action,
-          nte,
-          local: place,
-          ...details,
-          ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
-          ...(action === "editar" ? { adicionais: additional } : {}),
-          turnstileToken,
-        }),
-        signal: timeoutSignal(REQUEST_TIMEOUT),
-      });
+      const payload = {
+        modalidade: mode.toUpperCase(),
+        acao: action,
+        nte,
+        local: place,
+        ...details,
+        ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
+        ...(action === "editar" ? { adicionais: additional } : {}),
+        turnstileToken,
+      };
+      let response: Response;
+      if (!isCp && arquivo) {
+        // SM envia o PDF no mesmo POST; a rota repassa em base64 ao Apps Script,
+        // que grava o arquivo na pasta Drive do município.
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          formData.append(key, typeof value === "string" ? value : JSON.stringify(value));
+        });
+        formData.append("arquivo", arquivo);
+        response = await fetch("/api/inscricoes", {
+          method: "POST",
+          body: formData,
+          signal: timeoutSignal(REQUEST_TIMEOUT_UPLOAD),
+        });
+      } else {
+        response = await fetch("/api/inscricoes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: timeoutSignal(isCp ? REQUEST_TIMEOUT : REQUEST_TIMEOUT_UPLOAD),
+        });
+      }
       const result = await safeJson(response);
       if (!response.ok || result.ok === false) {
         throw new Error(result.message || result.error || "Não foi possível concluir o envio.");
@@ -377,6 +424,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     setCoordinator(undefined);
     setAccepted(false);
     setMessage("");
+    setArquivo(null);
+    setArquivoErro("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   const cpfMascarado = coordinator ? "•••.•••.•••-" + onlyDigits(coordinator.cpf).slice(-2) : "";
@@ -402,17 +452,19 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             </>
           ) : (
             <>
-              <p className="lead">Prezado(a) Gestor(a),</p>
-              <p>Este formulário tem como objetivo cadastrar os dados do Supervisor Municipal que atuará nas aplicações do SABE 2026, representando o município junto aos Núcleos Territoriais de Educação (NTE).</p>
-              <p><strong>Para realizar o preenchimento:</strong></p>
+              <p className="lead">Prezado(a) Ponto Focal do SABE,</p>
+              <p>Este formulário tem como finalidade coletar e cadastrar as informações dos Supervisores Municipais que atuarão na aplicação do Sistema de Avaliação Baiano da Educação (SABE) 2026, responsáveis pela interlocução entre os municípios e os respectivos Núcleos Territoriais de Educação (NTEs).</p>
+              <p><strong>Orientações para o preenchimento:</strong></p>
               <ol>
-                <li>Selecione o seu NTE.</li>
-                <li>Selecione o município.</li>
-                <li>Informe os dados pessoais do Supervisor Municipal responsável.</li>
-                <li>Informe os dados bancários para recebimento, se aplicável.</li>
-                <li>Revise todas as informações antes de concluir o envio.</li>
+                <li>Selecione o Núcleo Territorial de Educação (NTE) ao qual o município está vinculado.</li>
+                <li>Selecione o município correspondente.</li>
+                <li>Preencha os dados pessoais e de contato do Supervisor Municipal indicado.</li>
+                <li>Informe os dados bancários para fins de pagamento. Atenção: os dígitos verificadores da agência e da conta bancária deverão ser informados exclusivamente nos campos específicos, separados dos respectivos números. Não repita o dígito verificador no campo destinado ao número da agência ou da conta.</li>
+                <li>Anexe o ofício ou o e-mail da Secretaria Municipal de Educação, que confirma a indicação do Supervisor Municipal.</li>
+                <li>Revise cuidadosamente todas as informações antes de finalizar e enviar o formulário.</li>
               </ol>
-              <p><strong>Confira todas as informações antes de concluir o formulário.</strong></p>
+              <p>⚠️ <strong>ATENÇÃO:</strong> Confira todas as informações antes de concluir o formulário! A conferência dos dados é fundamental para assegurar a regularidade do cadastro, a comunicação com os profissionais indicados e a organização das atividades de aplicação do SABE 2026.</p>
+              <p>Agradecemos a colaboração e o comprometimento de todos/as.</p>
             </>
           )}
         </div>
@@ -624,6 +676,30 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               </div>
             </fieldset>
 
+            {!isCp && (
+              <fieldset><legend>Documento de indicação</legend>
+                <p className="field-help">
+                  Anexe o ofício ou o e-mail da Secretaria Municipal de Educação que confirma a indicação do Supervisor Municipal.
+                  Aceitamos apenas arquivo em PDF de até 4 MB. O documento será arquivado na pasta do município.
+                </p>
+                <label className="upload-box">
+                  <input
+                    ref={fileInputRef}
+                    name="arquivo"
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={handleFile}
+                    required
+                  />
+                  <span className="upload-icon" aria-hidden="true">↑</span>
+                  <span className="upload-title">{arquivo ? "Trocar o documento" : "Selecionar o documento em PDF"}</span>
+                  <span className="upload-hint">Clique para escolher o arquivo do seu dispositivo</span>
+                </label>
+                {arquivo && <p className="upload-file">Anexo selecionado: <strong>{arquivo.name}</strong> ({(arquivo.size / 1024 / 1024).toFixed(2)} MB)</p>}
+                {arquivoErro && <p className="form-message error" role="alert">{arquivoErro}</p>}
+              </fieldset>
+            )}
+
             {message && <p className="form-message error" role="alert">{message}</p>}
             <div className="form-actions split"><button className="button secondary" type="button" onClick={() => { if (isCp) { if (action === "editar" && coordinator) { openForm("validar"); } else setStage("candidate"); } else resetSelection(); }}>Cancelar</button><button className="button primary" type="submit">{isCp && action === "editar" ? "Conferir correções" : "Revisar dados"}<span>→</span></button></div>
           </form>
@@ -634,10 +710,13 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             <div className="section-heading"><span>03</span><div><h2>Revise antes de enviar</h2><p>Depois da confirmação, este formulário ficará indisponível para alterações.</p></div></div>
             <div className="review-block"><h3>Localização</h3><dl><div><dt>NTE</dt><dd>{nte}</dd></div><div><dt>{placeLabel}</dt><dd>{place}</dd></div></dl></div>
             <div className="review-block"><h3>{isCp && action === "validar" ? "Indicação validada" : "Responsável"}</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details] || key}</dt><dd>{value || "Não informado"}</dd></div>)}</dl></div>
+            {!isCp && (
+              <div className="review-block"><h3>Documento anexado</h3><dl><div><dt>Arquivo</dt><dd>{arquivo ? arquivo.name : "Nenhum arquivo anexado"}</dd></div></dl></div>
+            )}
             <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio.</span></label>
             {needsBotCheck && <BotCheck key={botAttempt} action="sabe-envio" onToken={setTurnstileToken} />}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken)} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
+            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken) || (!isCp && !arquivo)} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
           </div>
         )}
 

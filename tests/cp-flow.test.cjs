@@ -49,10 +49,21 @@ function fixture(legacyRows) {
     'Sim', 'Coordenador', 'Corrente', 'Banco Teste', '0001', '1', '1234', '5', '', '', '', '']];
   // Estrutura real da aba SM-SABE (17 colunas).
   const smHeaders = ['Subcoordenador', 'NTE', 'MUNICÍPIO', 'NOME', 'TELEFONE', 'E-MAIL', 'CPF', 'TIPO DE CONTA', 'BANCO',
-    'AGENCIA', 'DÍGITO AGÊNCIA', 'CONTA', 'DÍGITO CONTA', 'OPERAÇÃO', 'CHAVE PIX', 'ATUALIZADO', 'VALIDADO/ALTERADO FORM'];
-  const smRows = [smHeaders, ['', 'NTE 18', 'ALAGOINHAS', '', '', '', '', '', '', '', '', '', '', '', '', '', '']];
+    'AGENCIA', 'DÍGITO AGÊNCIA', 'CONTA', 'DÍGITO CONTA', 'OPERAÇÃO', 'CHAVE PIX', 'ATUALIZADO', 'VALIDADO/ALTERADO FORM', 'DOCUMENTO'];
+  const smRows = [smHeaders, ['', 'NTE 18', 'ALAGOINHAS', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']];
   const output = []; const cache = new Map();
   const scriptProps = new Map([['SABE_WEBHOOK_SECRET', 'test-secret']]);
+  const driveFiles = [];
+  const listIter = items => { let i = 0; return { hasNext: () => i < items.length, next: () => items[i++] }; };
+  const makeFolder = nome => {
+    const filhos = new Map();
+    return {
+      getFoldersByName: n => listIter(filhos.get(n) ? [filhos.get(n)] : []),
+      createFolder: n => { const f = makeFolder(n); filhos.set(n, f); return f; },
+      createFile: blob => { const f = { getUrl: () => `https://drive.example/${encodeURIComponent(nome)}/${encodeURIComponent(blob.getName())}`, getId: () => `file-${driveFiles.length}`, getName: () => blob.getName() }; driveFiles.push({ folder: nome, name: blob.getName(), bytes: blob.bytes }); return f; },
+    };
+  };
+  const driveRoot = makeFolder('__raiz__');
   const source = sheetFrom(rows, headers);
   const smSource = sheetFrom(smRows, smHeaders);
   const legacySource = legacyRows ? sheetFrom(legacyRows, legacyRows[0]) : null;
@@ -62,13 +73,15 @@ function fixture(legacyRows) {
     SpreadsheetApp: { openById: () => spreadsheet },
     CacheService: { getScriptCache: () => ({ get: key => cache.get(key), put: (key, value) => cache.set(key, value), remove: key => cache.delete(key) }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: key => scriptProps.get(key), setProperty: (key, value) => scriptProps.set(key, value) }) },
+    DriveApp: { getFolderById: () => driveRoot, getFoldersByName: n => driveRoot.getFoldersByName(n), createFolder: n => driveRoot.createFolder(n) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
-    Utilities: { DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (_, value) => [...crypto.createHash('sha256').update(value).digest()] },
+    Utilities: { DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (_, value) => [...crypto.createHash('sha256').update(value).digest()],
+      base64Decode: value => [...Buffer.from(value, 'base64')], newBlob: (bytes, type, name) => ({ bytes, type, getName: () => name }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: text => ({ setMimeType: () => JSON.parse(text) }) },
   };
   vm.createContext(sandbox); vm.runInContext(fs.readFileSync(path.join(root, 'google-apps-script/Code.gs'), 'utf8'), sandbox);
   const post = data => sandbox.doPost({ postData: { contents: JSON.stringify({ chave: 'test-secret', ...data }) } });
-  return { post, output, rows, smRows };
+  return { post, output, rows, smRows, driveFiles };
 }
 
 const env = { SABE_SHEETS_WEBHOOK_URL: 'https://example.test/exec', SABE_WEBHOOK_SECRET: 'test-secret' };
@@ -207,6 +220,7 @@ test('SM cadastrar: grava na aba SM-SABE na linha do NTE + municipio', async () 
     nome: 'Supervisor Teste', email: 'sup@example.test', telefone: '71999998888',
     cpf: '529.982.247-25', tipoConta: 'Corrente', banco: '001 BANCO',
     agencia: '1234', agenciaDigito: '5', conta: '5678', contaDigito: '9', pix: 'sup@example.test',
+    arquivoNome: 'oficio.pdf', arquivoTipo: 'application/pdf', arquivoBase64: 'JVBERi0xLjQ=',
   }));
   assert.equal(response.status, 200);
   assert.equal(h.f.output.length, 0, 'SM nao usa mais INSCRICOES SM');
@@ -214,6 +228,10 @@ test('SM cadastrar: grava na aba SM-SABE na linha do NTE + municipio', async () 
   assert.equal(h.f.smRows[1][3], 'Supervisor Teste');
   assert.equal(h.f.smRows[1][14], 'sup@example.test');
   assert.equal(h.f.smRows[1][16], '✓');
+  // O PDF vai para a pasta do municipio e o link fica na linha.
+  assert.equal(h.f.driveFiles.length, 1);
+  assert.equal(h.f.driveFiles[0].folder, 'ALAGOINHAS');
+  assert.match(h.f.smRows[1][17], /ALAGOINHAS\/oficio\.pdf$/);
 });
 
 test('SM cadastrar: repetir o mesmo municipio e recusado', async () => {
@@ -222,6 +240,7 @@ test('SM cadastrar: repetir o mesmo municipio e recusado', async () => {
     modalidade: 'SM', acao: 'cadastrar', nte: 'NTE 18', local: 'ALAGOINHAS',
     nome: 'Supervisor Teste', email: 'sup@example.test', telefone: '71999998888',
     cpf: '529.982.247-25', banco: '001 BANCO', agencia: '1234', conta: '5678', pix: 'sup@example.test',
+    arquivoNome: 'oficio.pdf', arquivoTipo: 'application/pdf', arquivoBase64: 'JVBERi0xLjQ=',
   };
   assert.equal((await h.submit.POST(request('/api/inscricoes', envio))).status, 200);
   assert.equal((await h.submit.POST(request('/api/inscricoes', envio))).status, 409);

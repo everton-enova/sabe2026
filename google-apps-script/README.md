@@ -23,3 +23,9 @@ está preenchida.
 O Supervisor Municipal (`modalidade: "SM"`) grava na aba oficial **`SM-SABE`**, na
 linha do NTE + MUNICÍPIO, também com **ATUALIZADO** e **VALIDADO/ALTERADO FORM**.
 A aba `INSCRICOES SM` não é mais usada.
+
+O upload do SM é enviado como `multipart/form-data` para `/api/inscricoes`, convertido
+em base64 e repassado ao Apps Script. O script salva o PDF (máximo 4 MB) em uma pasta
+do Google Drive com o **nome do município**, dentro da pasta definida em
+`SABE_DRIVE_FOLDER_ID`, e grava a URL do arquivo na coluna **DOCUMENTO** da `SM-SABE`.
+Sem `arquivoBase64` o cadastro do SM é recusado com HTTP 400.

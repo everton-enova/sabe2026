@@ -7,10 +7,11 @@
 3. Apague o conteúdo inicial de `Código.gs` e cole o conteúdo de `google-apps-script/Code.gs` deste projeto.
 4. Abra **Configurações do projeto → Propriedades do script**.
 5. Crie a propriedade `SABE_WEBHOOK_SECRET` e informe um segredo forte.
-6. Clique em **Implantar → Nova implantação**.
-7. Escolha **Aplicativo da Web**.
-8. Configure **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**. A planilha em si deve permanecer restrita à equipe; remova o compartilhamento público e não use mais o endpoint público de visualização.
-9. Autorize o acesso solicitado e copie a URL final terminada em `/exec`.
+6. (Upload SM) Crie a propriedade `SABE_DRIVE_FOLDER_ID` com o ID da pasta do Google Drive que receberá os documentos dos Supervisores Municipais. Uma pasta por município é criada automaticamente dentro dela. Sem essa propriedade, o script cria e usa a pasta `SABE 2026 - Documentos SM` na raiz do Drive de quem publicou o script.
+7. Clique em **Implantar → Nova implantação**.
+8. Escolha **Aplicativo da Web**.
+9. Configure **Executar como: Eu** e **Quem pode acessar: Qualquer pessoa**. A planilha em si deve permanecer restrita à equipe; remova o compartilhamento público e não use mais o endpoint público de visualização.
+10. Autorize o acesso solicitado e copie a URL final terminada em `/exec`.
 
 > **Cuidado:** depois de editar o código, use **Implantar → Gerenciar implantações → Editar (lápis) → Versão: Nova versão → Implantar**. Isso mantém a **mesma URL `/exec`**. Se você usar **"Nova implantação"**, é gerada uma URL nova e a Vercel continua apontando para a antiga (que roda o código velho).
 
@@ -64,7 +65,7 @@ No editor do Apps Script, escolha no topo a função **`removerAbasSaida`** e cl
 ## 5. Teste final
 
 1. Abra `/aplicacao/cp`, selecione um NTE e um polo e confirme que nome e CPF aparecem.
-2. Abra `/aplicacao/sm`, preencha um cadastro de teste e confirme o envio.
+2. Abra `/aplicacao/sm`, preencha um cadastro de teste, anexe um PDF e confirme o envio. Verifique se o arquivo apareceu na pasta do município dentro de `SABE_DRIVE_FOLDER_ID` e se o link foi gravado na coluna **DOCUMENTO** da aba `SM-SABE` (crie a coluna se ela ainda não existir).
 3. Confira na aba `CP- SABE` se a linha do polo ficou com `✓` em `VALIDADO/ALTERADO FORM` e a data/hora em `ATUALIZADO` (e, no caso de editar/alterar, com os dados atualizados). Para o Supervisor Municipal, confira a aba `SM-SABE`.
 4. Exclua o cadastro de teste antes de liberar a aplicação.
 

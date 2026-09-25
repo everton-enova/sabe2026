@@ -95,7 +95,8 @@ test('falha de envio diz a causa sem expor URL nem segredo', async () => {
   const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).locations[0];
   const envio = { modalidade: 'SM', acao: 'cadastrar', nte: location.nte, local: location.municipio,
     nome: 'Pessoa Teste', email: 'teste@example.test', telefone: '71999999999', cpf: '529.982.247-25',
-    banco: '001 BANCO', agencia: '0001', conta: '12345', pix: 'teste@example.test' };
+    banco: '001 BANCO', agencia: '0001', conta: '12345', pix: 'teste@example.test',
+    arquivoNome: 'oficio.pdf', arquivoTipo: 'application/pdf', arquivoBase64: 'JVBERi0xLjQ=' };
   for (const [nome, fetchStub, esperado] of [
     ['Apps Script recusa o acesso', async () => new Response('<html>Unauthorized</html>', { status: 403 }), 'HTTP 403'],
     ['implantação não existe mais', async () => new Response('', { status: 404 }), 'HTTP 404'],
@@ -118,7 +119,8 @@ test('turnstile exige token quando configurado e valida no siteverify', async ()
   const location = JSON.parse(fs.readFileSync(path.join(root, 'src/data/sabe.json'))).locations[0];
   const envio = { modalidade: 'SM', acao: 'cadastrar', nte: location.nte, local: location.municipio,
     nome: 'Pessoa Teste', email: 'teste@example.test', telefone: '71999999999', cpf: '529.982.247-25',
-    banco: '001 BANCO', agencia: '0001', conta: '12345', pix: 'teste@example.test' };
+    banco: '001 BANCO', agencia: '0001', conta: '12345', pix: 'teste@example.test',
+    arquivoNome: 'oficio.pdf', arquivoTipo: 'application/pdf', arquivoBase64: 'JVBERi0xLjQ=' };
   let calls = 0;
   const semToken = load('src/app/api/inscricoes/route.ts',
     { TURNSTILE_SECRET_KEY: 'turnstile-secret', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'site-key', SABE_SHEETS_WEBHOOK_URL: 'https://example.test', SABE_WEBHOOK_SECRET: 'test' },

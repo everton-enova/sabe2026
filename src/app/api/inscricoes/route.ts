@@ -12,6 +12,36 @@ const requiredBase = ["modalidade", "acao", "nte", "local"];
 const requiredDetails = ["nome", "email", "telefone", "cpf", "banco", "agencia", "conta", "pix"];
 // Vao para a aba oficial CP- SABE junto com os dados basicos.
 const extraDetails = ["experiencia", "funcao", "tipoConta", "agenciaDigito", "contaDigito", "operacao"];
+// Limite do PDF anexado no SM. Acima disso a Vercel recusa o corpo antes da rota.
+const MAX_PDF_BYTES = 4 * 1024 * 1024;
+
+type UploadedFile = { name: string; type: string; size: number; arrayBuffer: () => Promise<ArrayBuffer> };
+
+function parsePdf(type: string, name: string) {
+  return type === "application/pdf" || /\.pdf$/i.test(name);
+}
+
+/* O SM manda o PDF como multipart/form-data; o CP continua em JSON.
+   Nos dois casos o payload final e um objeto simples. */
+async function readPayload(request: Request): Promise<{ payload: Submission; arquivo: UploadedFile | null }> {
+  const contentType = request.headers.get("content-type")?.split(";")[0].trim();
+  if (contentType !== "multipart/form-data") return { payload: await readRequest(request), arquivo: null };
+  // Corta corpos muito grandes antes de bufferizar o upload inteiro.
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > MAX_PDF_BYTES + 1024 * 1024) throw new ApiError(413, "O documento deve ter no máximo 4 MB.");
+  let form: FormData;
+  try { form = await request.formData(); }
+  catch { throw new ApiError(400, "Não foi possível ler o formulário enviado."); }
+  const payload: Submission = {};
+  for (const [key, value] of form.entries()) {
+    if (typeof value === "string") payload[key] = value;
+  }
+  const file = form.get("arquivo");
+  const arquivo = file && typeof file === "object" && "arrayBuffer" in file && "size" in file
+    ? file as unknown as UploadedFile
+    : null;
+  return { payload, arquivo };
+}
 
 function hasText(payload: Submission, field: string) {
   return typeof payload[field] === "string" && payload[field].trim().length > 0;
@@ -34,7 +64,24 @@ function validCpf(value: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const payload = await readRequest(request);
+    const { payload, arquivo } = await readPayload(request);
+    // Le o anexo (multipart) ou aceita base64 ja codificado no JSON (integracoes e testes).
+    let arquivoNome = "";
+    let arquivoTipo = "";
+    let arquivoBase64 = "";
+    if (arquivo) {
+      if (arquivo.size > MAX_PDF_BYTES) throw new ApiError(413, "O documento deve ter no máximo 4 MB.");
+      if (!parsePdf(arquivo.type, arquivo.name)) throw new ApiError(400, "O documento deve estar em formato PDF.");
+      arquivoNome = arquivo.name;
+      arquivoTipo = "application/pdf";
+      arquivoBase64 = Buffer.from(await arquivo.arrayBuffer()).toString("base64");
+    } else if (typeof payload.arquivoBase64 === "string" && payload.arquivoBase64.length > 0) {
+      arquivoNome = typeof payload.arquivoNome === "string" ? payload.arquivoNome : "documento.pdf";
+      arquivoTipo = typeof payload.arquivoTipo === "string" ? payload.arquivoTipo : "application/pdf";
+      arquivoBase64 = payload.arquivoBase64;
+      if (!parsePdf(arquivoTipo, arquivoNome)) throw new ApiError(400, "O documento deve estar em formato PDF.");
+      if (Math.floor(arquivoBase64.length * 3 / 4) > MAX_PDF_BYTES) throw new ApiError(413, "O documento deve ter no máximo 4 MB.");
+    }
     const cp = payload.modalidade === "CP";
     const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
     if (!validFlow) throw new ApiError(400, "Modalidade ou ação inválida.");
@@ -44,6 +91,7 @@ export async function POST(request: Request) {
     const required = cp && payload.acao === "validar" ? requiredBase
       : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"] : [...requiredBase, ...requiredDetails];
     if (required.some(field => !hasText(payload, field))) throw new ApiError(400, "Preencha todos os campos obrigatórios.");
+    if (payload.modalidade === "SM" && !arquivoBase64) throw new ApiError(400, "Anexe o documento em PDF para concluir o cadastro.");
     if (!(cp && payload.acao === "validar")) {
       if ((hasText(payload, "email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payload.email))) || (hasText(payload, "telefone") && ![10, 11].includes(onlyDigits(payload.telefone).length)) || !validCpf(payload.cpf)) {
         throw new ApiError(400, "Confira o e-mail, o telefone e o CPF informados.");
@@ -67,6 +115,12 @@ export async function POST(request: Request) {
     }
     // Validation uses the source record, never identity/details supplied by the browser.
     if (cp && payload.acao === "validar") for (const field of [...requiredDetails, ...extraDetails]) delete submission[field];
+    // O anexo do SM nao passa pelo limite de 500 chars nem entra na lista de campos comuns.
+    if (payload.modalidade === "SM") {
+      submission.arquivoNome = arquivoNome.slice(0, 200);
+      submission.arquivoTipo = arquivoTipo;
+      submission.arquivoBase64 = arquivoBase64;
+    }
     await sheets({ ...submission, enviadoEm: new Date().toISOString() });
     return json({ ok: true });
   } catch (error) { return failure(error); }

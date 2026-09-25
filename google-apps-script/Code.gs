@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 /* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
-const CODE_VERSION = "2026-09-24-preload-global";
+const CODE_VERSION = "2026-09-25-upload-sm";
 const MIGRACAO_FLAG = "MIGRACAO_INSCRICOES_CP";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
@@ -44,10 +44,11 @@ const SM_FIELDS = {
   contaDigito: ["DÍGITO CONTA", "DIGITO CONTA", "DÍGITO DA CONTA"],
   operacao: ["OPERAÇÃO", "OPERACAO", "VARIAÇÃO/OPERAÇÃO"],
   pix: ["CHAVE PIX", "PIX"],
+  documento: ["DOCUMENTO", "LINK DO DOCUMENTO", "ARQUIVO", "OFÍCIO", "OFICIO", "ANEXO"],
   atualizado: ["ATUALIZADO"],
   validado: ["VALIDADO/ALTERADO FORM", "VALIDADO", "VALIDADO/ALTERADO"],
 };
-const SM_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao", "pix"];
+const SM_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao", "pix", "documento"];
 
 function response(data) {
   return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
@@ -142,6 +143,32 @@ function updateCpRow(spreadsheet, current, data) {
 /* SM: encontra a linha pelo NTE + MUNICÍPIO e grava os dados do supervisor. */
 function updateSmRow(spreadsheet, sm, rowNumber, data) {
   writeValidatedRow(sm, rowNumber, data, SM_DATA_FIELDS);
+}
+/* SM: grava o oficio/e-mail em PDF na pasta Drive do municipio.
+   A pasta raiz vem da propriedade SABE_DRIVE_FOLDER_ID; sem ela, cria/usa
+   "SABE 2026 - Documentos SM" na raiz do Drive de quem executa o script. */
+function pastaMunicipio(nome) {
+  const props = PropertiesService.getScriptProperties();
+  const parentId = props.getProperty("SABE_DRIVE_FOLDER_ID");
+  let parent;
+  if (parentId) {
+    parent = DriveApp.getFolderById(parentId);
+  } else {
+    const nomeRaiz = "SABE 2026 - Documentos SM";
+    const existentes = DriveApp.getFoldersByName(nomeRaiz);
+    parent = existentes.hasNext() ? existentes.next() : DriveApp.createFolder(nomeRaiz);
+  }
+  const nomePasta = String(nome || "SEM MUNICIPIO").replace(/[\\/:*?"<>|]/g, "-").trim().toUpperCase();
+  const pastas = parent.getFoldersByName(nomePasta);
+  return pastas.hasNext() ? pastas.next() : parent.createFolder(nomePasta);
+}
+function salvarDocumentoSm(data) {
+  if (!data.arquivoBase64 || !data.arquivoNome) return null;
+  const nome = String(data.arquivoNome).replace(/[\\/:*?"<>|]/g, "-");
+  const bytes = Utilities.base64Decode(data.arquivoBase64);
+  const blob = Utilities.newBlob(bytes, data.arquivoTipo || "application/pdf", nome);
+  const file = pastaMunicipio(data.local).createFile(blob);
+  return { url: file.getUrl(), id: file.getId(), nome: file.getName() };
 }
 function validatedPolos(spreadsheet, nte) {
   const cp = cpSheet(spreadsheet);
@@ -259,7 +286,7 @@ function migrarAgora() {
 function doPost(event) {
   let data;
   try {
-    if (!event.postData || event.postData.contents.length > 20000) return response({ ok: false, code: "INVALID" });
+    if (!event.postData || event.postData.contents.length > 15000000) return response({ ok: false, code: "INVALID" });
     data = JSON.parse(event.postData.contents);
   } catch (error) { return response({ ok: false, code: "INVALID" }); }
   if (!data || !isAuthorized(data.chave)) return response({ ok: false, code: "UNAUTHORIZED" });
@@ -306,6 +333,11 @@ function doPost(event) {
     const offset = rows.findIndex(row => nteNumber(row[nteColumn]) === nteNumber(data.nte) && normalized(row[municipioColumn]) === normalized(data.local));
     if (offset < 0) return response({ ok: false, code: "NOT_FOUND" });
     if (sm.map.validado >= 0 && String(rows[offset][sm.map.validado] || "").trim()) return response({ ok: false, code: "DUPLICATE" });
+    // Grava o anexo antes de marcar a linha: se o Drive falhar, nada e validado.
+    let documento;
+    try { documento = salvarDocumentoSm(data); } catch (error) { return response({ ok: false, code: "UPLOAD_FAILED" }); }
+    if (!documento) return response({ ok: false, code: "UPLOAD_FAILED" });
+    data.documento = documento.url;
     updateSmRow(spreadsheet, sm, offset + 2, data);
     return response({ ok: true });
   } finally { lock.releaseLock(); }

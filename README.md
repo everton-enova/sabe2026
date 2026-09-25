@@ -6,7 +6,7 @@ Plataforma de aplicações SABE 2026 em Next.js, TypeScript e App Router.
 
 - `/` — seleção da modalidade
 - `/aplicacao/cp` — seleção de NTE/polo, validação da indicação ou alteração cadastral
-- `/aplicacao/sm` — seleção de NTE/município e cadastro do supervisor
+- `/aplicacao/sm` — seleção de NTE/município, cadastro do supervisor e upload do ofício/e-mail em PDF
 - `/api/inscricoes` — valida e encaminha os envios ao Google Sheets
 - `/api/indicacoes` — consulta autenticada do CP, sem GET público
 

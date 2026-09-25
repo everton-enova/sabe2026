@@ -75,7 +75,9 @@ export async function sheets(payload: Record<string, unknown>) {
   try {
     response = await fetch(url, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store", signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store",
+      // O upload do PDF para o Drive leva bem mais que uma gravacao simples.
+      signal: AbortSignal.timeout(typeof payload.arquivoBase64 === "string" && payload.arquivoBase64 ? 55000 : 15000),
     });
   } catch (error) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
@@ -102,6 +104,7 @@ export async function sheets(payload: Record<string, unknown>) {
       CONFLICT: [409, "A indicação foi atualizada. Consulte o polo novamente antes de enviar."],
       DUPLICATE: [409, "Este formulário já foi enviado."],
       INVALID: [400, "Confira os dados informados."],
+      UPLOAD_FAILED: [502, "Não foi possível salvar o documento no Google Drive. Tente novamente."],
     };
     const code = typeof result.code === "string" ? result.code : "";
     const [status, message] = messages[code] || [502, "Não foi possível concluir a operação na planilha."];
