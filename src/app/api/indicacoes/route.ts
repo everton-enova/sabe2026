@@ -15,5 +15,8 @@ export async function POST(request: Request) {
     // Ultima barreira: sem este guarda, json(undefined) estoura e o erro chega como 502.
     if (!result.coordinator) throw new ApiError(404, "Não encontramos uma indicação para este polo.");
     return json(result.coordinator);
-  } catch (error) { return failure(error); }
+  } catch (error) {
+    console.error("SABE indicacoes erro:", error instanceof Error ? error.message : error, "— stack:", error instanceof Error ? error.stack?.slice(0, 500) : "n/a");
+    return failure(error);
+  }
 }

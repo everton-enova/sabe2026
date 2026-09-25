@@ -88,7 +88,7 @@ export async function sheets(payload: Record<string, unknown>) {
   }
   if (!response.ok) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
-    throw new ApiError(502, "Não foi possível acessar a planilha.", `o Apps Script respondeu HTTP ${response.status}: 401 ou 403 é implantação sem acesso "Qualquer pessoa"; 404 é URL /exec de uma implantação que não existe mais`);
+    throw new ApiError(502, "Não foi possível acessar a planilha.", `o Apps Script respondeu HTTP ${response.status}: 401/403 = implantação sem acesso "Qualquer pessoa"; 404 = URL /exec de implantação removida`);
   }
   let result: Record<string, unknown>;
   try {
