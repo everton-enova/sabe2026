@@ -105,6 +105,8 @@ export async function sheets(payload: Record<string, unknown>) {
       DUPLICATE: [409, "Este formulário já foi enviado."],
       INVALID: [400, "Confira os dados informados."],
       UPLOAD_FAILED: [502, "Não foi possível salvar o documento no Google Drive. Tente novamente."],
+      BUSY: [503, "A planilha está ocupada. Aguarde alguns segundos e tente novamente."],
+      INTERNAL: [502, "Não foi possível concluir a operação na planilha."],
     };
     const code = typeof result.code === "string" ? result.code : "";
     const [status, message] = messages[code] || [502, "Não foi possível concluir a operação na planilha."];

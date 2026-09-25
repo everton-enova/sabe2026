@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 /* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
-const CODE_VERSION = "2026-09-25-upload-sm";
+const CODE_VERSION = "2026-09-25-diagnostico";
 const MIGRACAO_FLAG = "MIGRACAO_INSCRICOES_CP";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
@@ -126,22 +126,30 @@ function lookup(spreadsheet, nte, polo) {
   return coordinator;
 }
 function writeValidatedRow(info, rowNumber, data, dataFields) {
-  const write = (column, value) => { if (column >= 0) info.sheet.getRange(rowNumber, column + 1).setValue(textCell(value)); };
+  const errors = [];
+  const write = (column, value) => {
+    if (column < 0) return;
+    try { info.sheet.getRange(rowNumber, column + 1).setValue(textCell(value)); }
+    catch (e) { errors.push("col " + (column + 1) + ": " + e.message); }
+  };
   dataFields.forEach(field => { if (data[field] !== undefined) write(info.map[field], data[field]); });
   write(info.map.atualizado, data.enviadoEm || new Date().toISOString());
   write(info.map.validado, "✓");
+  if (errors.length) throw new Error("Erro ao gravar: " + errors.join("; "));
 }
 /* Grava a validacao na propria aba oficial: atualiza os dados do coordenador
    (em editar/alterar) e marca ATUALIZADO + VALIDADO/ALTERADO FORM. */
 function updateCpRow(spreadsheet, current, data) {
   const cp = cpSheet(spreadsheet);
-  if (!cp) return;
+  if (!cp) throw new Error("Aba CP- SABE não encontrada.");
   const rowNumber = Number(String(current.registro).split(":")[1]);
-  if (!(rowNumber >= 2)) return;
+  if (!(rowNumber >= 2)) throw new Error("Número da linha inválido: " + current.registro);
   writeValidatedRow(cp, rowNumber, data, data.acao === "validar" ? [] : CP_DATA_FIELDS);
 }
 /* SM: encontra a linha pelo NTE + MUNICÍPIO e grava os dados do supervisor. */
 function updateSmRow(spreadsheet, sm, rowNumber, data) {
+  if (!sm) throw new Error("Aba SM-SABE não encontrada.");
+  if (!(rowNumber >= 2)) throw new Error("Número da linha inválido: " + rowNumber);
   writeValidatedRow(sm, rowNumber, data, SM_DATA_FIELDS);
 }
 /* SM: grava o oficio/e-mail em PDF na pasta Drive do municipio.
@@ -349,5 +357,7 @@ function doPost(event) {
     data.documento = documento.url;
     updateSmRow(spreadsheet, sm, offset + 2, data);
     return response({ ok: true });
+  } catch (error) {
+    return response({ ok: false, code: "INTERNAL", error: String(error && error.message ? error.message : error) });
   } finally { lock.releaseLock(); }
 }

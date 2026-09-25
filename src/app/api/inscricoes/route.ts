@@ -123,5 +123,9 @@ export async function POST(request: Request) {
     }
     await sheets({ ...submission, enviadoEm: new Date().toISOString() });
     return json({ ok: true });
-  } catch (error) { return failure(error); }
+  } catch (error) {
+    if (error instanceof Error && "detail" in error) console.error("SABE inscricoes erro:", error.message, "— detalhe:", (error as { detail?: string }).detail);
+    else console.error("SABE inscricoes erro:", error);
+    return failure(error);
+  }
 }
