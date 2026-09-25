@@ -88,32 +88,32 @@ export async function sheets(payload: Record<string, unknown>) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
     throw new ApiError(503, "Conexão com a planilha ainda não configurada.");
   }
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store",
-      // Sem base64 (Supabase Storage) o Apps Script so grava na planilha: 15s.
-      // Com base64 fallback (Drive) precisa de mais tempo: 55s.
-      signal: AbortSignal.timeout(
-        (typeof payload.arquivoBase64 === "string" && payload.arquivoBase64) ? 55000 : 15000
-      ),
-    });
-  } catch (error) {
-    if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
-    throw new ApiError(502, "Não foi possível acessar a planilha.", `a requisição ao Apps Script falhou (${nomeDoErro(error)}): confira se SABE_SHEETS_WEBHOOK_URL termina em /exec`);
-  }
-  // Webhook frio pode passar de 15s: ao invés de abortar e cair no fallback cego, dá uma segunda chance.
-  if (payload.tipo !== "indicacao" && !response.ok && (response.status === 404 || response.status === 405)) {
+  /* O Apps Script frio pode levar 20s+ (cold start). A rota tem maxDuration 60s,
+     então usamos 35s com uma segunda tentativa de 25s: quase sempre a 1a esquentou
+     o script e a 2a passa. Antes o timeout era 15s e estourava no meio do cold start. */
+  const withTimeout = (ms: number) => AbortSignal.timeout(ms);
+  let response: Response | null = null;
+  let lastError: unknown = null;
+  for (let tentativa = 0; tentativa < 2 && !response; tentativa += 1) {
     try {
       response = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store",
-        signal: AbortSignal.timeout(
-          (typeof payload.arquivoBase64 === "string" && payload.arquivoBase64) ? 55000 : 15000
+        signal: withTimeout(
+          (typeof payload.arquivoBase64 === "string" && payload.arquivoBase64) ? 55000 : 35000
         ),
       });
-    } catch { /* mantém a primeira resposta; o tratamento abaixo decide */ }
+    } catch (error) {
+      lastError = error;
+      if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
+      if (tentativa === 0) continue; // segunda chance: script ja esquentou
+      throw new ApiError(502, "Não foi possível acessar a planilha.", `a requisição ao Apps Script falhou (${nomeDoErro(error)}): confira se SABE_SHEETS_WEBHOOK_URL termina em /exec`);
+    }
+  }
+  if (!response) {
+    const nome = nomeDoErro(lastError);
+    if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
+    throw new ApiError(502, "Não foi possível acessar a planilha.", `a requisição ao Apps Script falhou (${nome}): confira se SABE_SHEETS_WEBHOOK_URL termina em /exec`);
   }
   if (!response.ok) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
