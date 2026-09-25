@@ -163,11 +163,18 @@ function pastaMunicipio(nome) {
   return pastas.hasNext() ? pastas.next() : parent.createFolder(nomePasta);
 }
 function salvarDocumentoSm(data) {
-  if (!data.arquivoBase64 || !data.arquivoNome) return null;
+  if (!data.arquivoBase64 || !data.arquivoNome) return { falha: true, motivo: "arquivoBase64 ou arquivoNome ausente" };
   const nome = String(data.arquivoNome).replace(/[\\/:*?"<>|]/g, "-");
-  const bytes = Utilities.base64Decode(data.arquivoBase64);
+  let bytes;
+  try { bytes = Utilities.base64Decode(data.arquivoBase64); }
+  catch (e) { return { falha: true, motivo: "base64 inválido: " + e.message }; }
   const blob = Utilities.newBlob(bytes, data.arquivoTipo || "application/pdf", nome);
-  const file = pastaMunicipio(data.local).createFile(blob);
+  let pasta;
+  try { pasta = pastaMunicipio(data.local); }
+  catch (e) { return { falha: true, motivo: "pasta do município: " + e.message }; }
+  let file;
+  try { file = pasta.createFile(blob); }
+  catch (e) { return { falha: true, motivo: "createFile: " + e.message }; }
   return { url: file.getUrl(), id: file.getId(), nome: file.getName() };
 }
 function validatedPolos(spreadsheet, nte) {
@@ -334,9 +341,11 @@ function doPost(event) {
     if (offset < 0) return response({ ok: false, code: "NOT_FOUND" });
     if (sm.map.validado >= 0 && String(rows[offset][sm.map.validado] || "").trim()) return response({ ok: false, code: "DUPLICATE" });
     // Grava o anexo antes de marcar a linha: se o Drive falhar, nada e validado.
-    let documento;
-    try { documento = salvarDocumentoSm(data); } catch (error) { return response({ ok: false, code: "UPLOAD_FAILED" }); }
-    if (!documento) return response({ ok: false, code: "UPLOAD_FAILED" });
+    const documento = salvarDocumentoSm(data);
+    if (documento && documento.falha) {
+      return response({ ok: false, code: "UPLOAD_FAILED", error: documento.motivo });
+    }
+    if (!documento || !documento.url) return response({ ok: false, code: "UPLOAD_FAILED", error: "retorno vazio do salvarDocumentoSm" });
     data.documento = documento.url;
     updateSmRow(spreadsheet, sm, offset + 2, data);
     return response({ ok: true });

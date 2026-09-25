@@ -463,8 +463,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <li>Anexe o ofício ou o e-mail da Secretaria Municipal de Educação, que confirma a indicação do Supervisor Municipal.</li>
                 <li>Revise cuidadosamente todas as informações antes de finalizar e enviar o formulário.</li>
               </ol>
-              <br />
-              <p>⚠️ <strong>ATENÇÃO:</strong> Confira todas as informações antes de concluir o formulário! A conferência dos dados é fundamental para assegurar a regularidade do cadastro, a comunicação com os profissionais indicados e a organização das atividades de aplicação do SABE 2026.</p>
+              <div className="section-spacer" />
+              <p><strong>⚠️ ATENÇÃO: Confira todas as informações antes de concluir o formulário! A conferência dos dados é fundamental para assegurar a regularidade do cadastro, a comunicação com os profissionais indicados e a organização das atividades de aplicação do SABE 2026.</strong></p>
               <p>Agradecemos a colaboração e o comprometimento de todos/as.</p>
             </>
           )}
