@@ -136,7 +136,12 @@ export async function sheets(payload: Record<string, unknown>) {
       CONFLICT: [409, "A indicação foi atualizada. Consulte o polo novamente antes de enviar."],
       DUPLICATE: [409, "Este formulário já foi enviado."],
       INVALID: [400, "Confira os dados informados."],
-      UPLOAD_FAILED: [502, "Não foi possível salvar o documento no Google Drive. Tente novamente."],
+      /* O PDF já subiu para o Supabase antes deste POST; se o Apps Script publicado ainda
+         for a versão antiga ele ignora documentoUrl e tenta o Drive sem base64. Ajudamos
+         a diagnosticar em vez de repetir a mensagem opaca do Drive. */
+      UPLOAD_FAILED: [502, typeof result.error === "string" && /base64|arquivoNome|documento/i.test(result.error)
+        ? "O aplicativo já salvou o documento, mas a planilha ainda usa uma versão antiga. Publique a nova versão do Apps Script (Code.gs) e tente novamente."
+        : "Não foi possível salvar o documento no Google Drive. Tente novamente."],
       BUSY: [503, "A planilha está ocupada. Aguarde alguns segundos e tente novamente."],
       INTERNAL: [502, "Não foi possível concluir a operação na planilha."],
     };
