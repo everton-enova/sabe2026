@@ -44,14 +44,31 @@ function parseCsv(csv: string) {
   return rows;
 }
 
+/* Sem instanceof: o erro do fetch (timeout/rede) não é ApiError e escapava como o 502 genérico
+   "Não foi possível consultar os dados deste polo." — a causa ficava escondida e o usuário via
+   uma mensagem sem saída. Aqui todo caminho de erro vira ApiError com a causa real. */
 async function publicIndication(nte: string, polo: string) {
   const endpoint = new URL("https://docs.google.com/spreadsheets/d/1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8/gviz/tq");
   endpoint.searchParams.set("tqx", "out:csv");
   endpoint.searchParams.set("sheet", "CP- SABE ");
   endpoint.searchParams.set("tq", "select *");
-  const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(15000) });
-  if (!response.ok) throw new ApiError(502, "Não foi possível consultar a planilha.");
-  const rows = parseCsv(await response.text());
+  // O gviz do Google pode demorar sob carga; uma segunda tentativa cobre picos momentâneos.
+  let response: Response | null = null;
+  let lastError: unknown = null;
+  for (let tentativa = 0; tentativa < 2 && !response; tentativa += 1) {
+    try {
+      response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(25000) });
+    } catch (error) {
+      lastError = error;
+      if (tentativa === 0) await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  }
+  if (!response) throw new ApiError(504, "A planilha de consulta está fora do ar no momento. Aguarde alguns segundos e tente novamente.", `a leitura pública da planilha não respondeu (${nomeDoErro(lastError)}). O webhook também falhou antes — confira SABE_SHEETS_WEBHOOK_URL e SABE_WEBHOOK_SECRET no Vercel.`);
+  if (!response.ok) throw new ApiError(502, "Não foi possível consultar a planilha de consulta.", `a leitura pública respondeu HTTP ${response.status}`);
+  const csv = await response.text().catch((error: unknown) => {
+    throw new ApiError(502, "Não foi possível consultar a planilha de consulta.", `a resposta pública chegou truncada (${nomeDoErro(error)})`);
+  });
+  const rows = parseCsv(csv);
   const headers = rows[0] || [];
   const selected = rows.slice(1).find(row => nteNumber(row[1]) === nteNumber(nte) && normalized(row[2]) === normalized(polo));
   if (!selected) throw new ApiError(404, "Não encontramos uma indicação para este polo.");
@@ -85,6 +102,18 @@ export async function sheets(payload: Record<string, unknown>) {
   } catch (error) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
     throw new ApiError(502, "Não foi possível acessar a planilha.", `a requisição ao Apps Script falhou (${nomeDoErro(error)}): confira se SABE_SHEETS_WEBHOOK_URL termina em /exec`);
+  }
+  // Webhook frio pode passar de 15s: ao invés de abortar e cair no fallback cego, dá uma segunda chance.
+  if (payload.tipo !== "indicacao" && !response.ok && (response.status === 404 || response.status === 405)) {
+    try {
+      response = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, chave: secret }), cache: "no-store",
+        signal: AbortSignal.timeout(
+          (typeof payload.arquivoBase64 === "string" && payload.arquivoBase64) ? 55000 : 15000
+        ),
+      });
+    } catch { /* mantém a primeira resposta; o tratamento abaixo decide */ }
   }
   if (!response.ok) {
     if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);

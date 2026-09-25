@@ -255,7 +255,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         const result = await safeJson(response);
 
         if (!response.ok || result.ok === false || (!result.nome && !result.registro)) {
-          throw new Error(result.message || result.error || "Não foi possível localizar a indicação.");
+          const base = result.message || result.error || "Não foi possível localizar a indicação.";
+          // Mostra também a causa da API (detalhe) para a mensagem não ficar opaca.
+          const causa = typeof result.detalhe === "string" ? ` ${result.detalhe}` : "";
+          throw new Error(`${base}${causa}`);
         }
 
         setCoordinator(result as unknown as Coordinator);

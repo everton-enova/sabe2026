@@ -14,7 +14,15 @@ export function json(data: unknown, status = 200) {
 export function failure(error: unknown) {
   if (error instanceof ApiError) return json({ message: error.message, ...(error.detail ? { detalhe: error.detail } : {}) }, error.status);
   console.error("SABE API failure", error);
-  return json({ message: "Não foi possível consultar os dados deste polo." }, 502);
+  // Erro inesperado (não ApiError): mantém o 502, mas inclui a causa real no detalhe
+  // e orienta quem está do outro lado em vez de repetir a mesma frase opaca.
+  const causa = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return json({
+    message: error instanceof Error && /(timeout|abort)/i.test(error.name)
+      ? "A consulta demorou mais que o esperado. Aguarde alguns segundos e tente novamente."
+      : "Não foi possível consultar os dados deste polo.",
+    detalhe: `Erro interno registrado (${causa.slice(0, 300)}).`,
+  }, 502);
 }
 export async function readRequest(request: Request): Promise<Record<string, unknown>> {
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") throw new ApiError(415, "Envie os dados em JSON.");
