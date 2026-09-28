@@ -25,6 +25,8 @@ def clean(value: object) -> str:
 
 def nte_label(value: object) -> str:
     digits = "".join(char for char in clean(value) if char.isdigit())
+    if not digits:
+        return ""
     return f"NTE {int(digits):02d}"
 
 
@@ -33,26 +35,20 @@ def main() -> None:
     target = Path(sys.argv[2] if len(sys.argv) > 2 else "src/data/sabe.json")
     workbook = openpyxl.load_workbook(source, read_only=True, data_only=True)
 
-    municipality_nte: dict[str, str] = {}
-    for row in workbook["MUN-NTE"].iter_rows(min_row=2, values_only=True):
-        values = list(row) + [None, None]
-        if values[0] and values[1]:
-            municipality_nte[key(values[0])] = nte_label(values[1])
-    # Confirmed manually in the source spreadsheet.
-    municipality_nte["BARRO PRETO"] = "NTE 05"
-
+    # Aba "MUNICIPIOS POR POLOS" (colunas: NTE, Polo, Município).
     locations = []
     for row in workbook["MUNICIPIOS POR POLOS"].iter_rows(min_row=2, values_only=True):
-        values = list(row) + [None, None]
-        if not values[0] or not values[1]:
+        values = list(row) + [None, None, None]
+        nte, polo, municipio = values[0], values[1], values[2]
+        if not polo or not municipio:
             continue
-        municipality = clean(values[1])
+        municipality = clean(municipio)
         if key(municipality) == "GOVERNADOR LOMANTO JUNIOR":
             municipality = "BARRO PRETO"
         locations.append(
             {
-                "nte": municipality_nte[key(municipality)],
-                "polo": clean(values[0]).upper(),
+                "nte": nte_label(nte),
+                "polo": clean(polo).upper(),
                 "municipio": municipality.upper(),
             }
         )
