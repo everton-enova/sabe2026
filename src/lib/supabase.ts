@@ -43,6 +43,12 @@ export async function uploadDocumento(
   });
   if (error) throw new Error(`Upload falhou: ${error.message}`);
 
+  /* getPublicUrl apenas monta a string e nao confere se o objeto existe — foi o
+     caso do TEOLANDIA: link gravado na planilha com o arquivo ausente no bucket
+     (NoSuchKey). Confirma que o objeto foi de fato persistido antes de devolver. */
+  const { data: info, error: infoError } = await supabase.storage.from(bucket).info(path);
+  if (infoError || !info) throw new Error(`Upload não confirmado no Storage: ${infoError?.message || "objeto ausente"}`);
+
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
