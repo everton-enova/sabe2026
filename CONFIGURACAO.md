@@ -66,7 +66,7 @@ No editor do Apps Script, escolha no topo a função **`removerAbasSaida`** e cl
 
 1. Abra `/aplicacao/cp`, selecione um NTE e um polo e confirme que nome e CPF aparecem.
 2. Abra `/aplicacao/sm`, preencha um cadastro de teste, anexe um PDF e confirme o envio. Verifique se o arquivo apareceu na pasta do município dentro de `SABE_DRIVE_FOLDER_ID` e se o link foi gravado na coluna **DOCUMENTO** da aba `SM-SABE` (crie a coluna se ela ainda não existir).
-3. Confira na aba `CP- SABE` se a linha do polo ficou com `✓` em `VALIDADO/ALTERADO FORM` e a data/hora em `ATUALIZADO` (e, no caso de editar/alterar, com os dados atualizados). Para o Supervisor Municipal, confira a aba `SM-SABE`.
+3. Confira na aba `CP- SABE` se a linha do polo ficou com `✓` em `VALIDADO/ALTERADO FORM` e a data/hora em `ATUALIZADO` (em horário de Brasília, formato `dd/MM/yyyy HH:mm:ss` — o servidor envia UTC e o Apps Script converte na gravação; e, no caso de editar/alterar, com os dados atualizados). Para o Supervisor Municipal, confira a aba `SM-SABE`.
 4. Exclua o cadastro de teste antes de liberar a aplicação.
 
 ## O que funciona sem variáveis

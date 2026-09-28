@@ -15,13 +15,17 @@ Na gravação, o script relê a indicação sob bloqueio e rejeita versões desa
 - `alterar` exige CPF diferente e grava a pessoa substituta na própria linha.
 
 Em todas as ações de CP a aba oficial recebe a data/hora em **ATUALIZADO** e um `✓`
-em **VALIDADO/ALTERADO FORM**. A `INSCRICOES CP` não é mais usada para CP — a
+em **VALIDADO/ALTERADO FORM**. O horário é gravado no **fuso da planilha** (Brasília,
+UTC-3), formato `dd/MM/yyyy HH:mm:ss` — o `enviadoEm` chega do servidor em UTC
+(`toISOString()`) e é convertido na gravação, para não ficar 3 horas à frente do
+horário real da validação. A `INSCRICOES CP` não é mais usada para CP — a
 validação vive na própria `CP- SABE` e a aba pode ser excluída. O endpoint
 `tipo: "validados"` devolve os polos de um NTE cuja coluna **VALIDADO/ALTERADO FORM**
 está preenchida.
 
 O Supervisor Municipal (`modalidade: "SM"`) grava na aba oficial **`SM-SABE`**, na
-linha do NTE + MUNICÍPIO, também com **ATUALIZADO** e **VALIDADO/ALTERADO FORM**.
+linha do NTE + MUNICÍPIO, também com **ATUALIZADO** (horário de Brasília) e
+**VALIDADO/ALTERADO FORM**.
 A aba `INSCRICOES SM` não é mais usada.
 
 O upload do SM é enviado como `multipart/form-data` para `/api/inscricoes`, convertido

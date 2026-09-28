@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 /* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
-const CODE_VERSION = "2026-09-25-supabase";
+const CODE_VERSION = "2026-09-26-horario-brasilia";
 const MIGRACAO_FLAG = "MIGRACAO_INSCRICOES_CP";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
@@ -70,6 +70,15 @@ function textCell(value) {
   // Sheets interprets leading '=' as a formula; also protect CSV exports.
   return /^[\s]*[=+@-]/.test(text) ? "'" + text : text;
 }
+/* ATUALIZADO deve registar o horario LOCAL da planilha (Brasilia, UTC-3), nao UTC:
+   o enviadoEm chega como ISO UTC do servidor e, gravado cru, fica 3h a frente
+   do horario real de quem validou. O fallback usa o instante atual do script. */
+function localTimestamp(value, spreadsheet) {
+  const timeZone = spreadsheet.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  const date = value ? new Date(String(value)) : new Date();
+  if (isNaN(date.getTime())) return String(value || "");
+  return Utilities.formatDate(date, timeZone, "dd/MM/yyyy HH:mm:ss");
+}
 function columnMap(headers, fields) {
   const map = {};
   Object.keys(fields).forEach(field => {
@@ -133,7 +142,7 @@ function writeValidatedRow(info, rowNumber, data, dataFields) {
     catch (e) { errors.push("col " + (column + 1) + ": " + e.message); }
   };
   dataFields.forEach(field => { if (data[field] !== undefined) write(info.map[field], data[field]); });
-  write(info.map.atualizado, data.enviadoEm || new Date().toISOString());
+  write(info.map.atualizado, localTimestamp(data.enviadoEm, info.sheet.getParent()));
   write(info.map.validado, "✓");
   if (errors.length) throw new Error("Erro ao gravar: " + errors.join("; "));
 }
@@ -260,7 +269,7 @@ function migrarInscricoesParaCpSabe(spreadsheet, force) {
         if (conta.digito) changes.contaDigito = conta.digito;
         changes.pix = at(row, "CHAVE PIX", 12);
       }
-      changes.atualizado = at(row, "DATA/HORA", 0) || new Date().toISOString();
+      changes.atualizado = at(row, "DATA/HORA", 0) || localTimestamp(null, spreadsheet);
       changes.validado = "✓";
       plan.set(rowNumber, changes);
       migrados += 1;
