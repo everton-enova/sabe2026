@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = "1It6KcaRdBMxVsQsis0ZTWSAuaUy4S_mvYxmVV2fBrg8";
 /* Muda a cada publicacao relevante. Serve para confirmar, pela web, qual codigo esta no ar. */
-const CODE_VERSION = "2026-09-26-horario-brasilia";
+const CODE_VERSION = "2026-09-28-monitoramento";
 const MIGRACAO_FLAG = "MIGRACAO_INSCRICOES_CP";
 const CP_SHEET = "CP- SABE ";
 /* Colunas da aba oficial localizadas pelo CABEÇALHO, nunca por índice fixo.
@@ -293,6 +293,76 @@ function migrarInscricoesParaCpSabe(spreadsheet, force) {
     return { migrados };
   } finally { lock.releaseLock(); }
 }
+/* Converte um valor de ATUALIZADO (ISO UTC ou dd/MM/yyyy HH:mm:ss) para instante. */
+function parseDataHora(value) {
+  const texto = String(value || "").trim();
+  if (!texto) return null;
+  const iso = new Date(texto);
+  if (!isNaN(iso.getTime())) return iso.getTime();
+  const m = texto.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +m[6]);
+  return null;
+}
+/* Agrega por NTE os polos validados (CP) e os municípios com supervisor cadastrado
+   (SM). Percorre TODAS as linhas das duas abas (mesmo sem validação, para a aba
+   mostrar os NTEs zerados) e devolve um array ordenado por número do NTE. */
+function montarMonitor(spreadsheet) {
+  const resumo = new Map();
+  const conta = (sInfo, tipo) => {
+    if (!sInfo || sInfo.map.nte < 0 || sInfo.map.validado < 0 || sInfo.sheet.getLastRow() < 2) return;
+    const nteCol = sInfo.map.nte;
+    const validadoCol = sInfo.map.validado;
+    const atualizadoCol = sInfo.map.atualizado >= 0 ? sInfo.map.atualizado : -1;
+    const rows = sInfo.sheet.getRange(2, 1, sInfo.sheet.getLastRow() - 1, sInfo.columns).getDisplayValues();
+    rows.forEach((row, index) => {
+      const nte = String(row[nteCol] || "").replace(/\D/g, "");
+      if (!nte) return;
+      const chave = String(Number(nte));
+      if (!resumo.has(chave)) {
+        resumo.set(chave, { nte: "NTE " + String(Number(nte)).padStart(2, "0"), cp: 0, sm: 0, ultimoCp: null, ultimoSm: null });
+      }
+      if (!String(row[validadoCol] || "").trim()) return;
+      const item = resumo.get(chave);
+      item[tipo] += 1;
+      const instante = atualizadoCol >= 0 ? parseDataHora(row[atualizadoCol]) : null;
+      const campo = tipo === "cp" ? "ultimoCp" : "ultimoSm";
+      if (instante !== null && item[campo] === null) item[campo] = instante;
+      else if (instante !== null && instante > item[campo]) item[campo] = instante;
+    });
+  };
+  conta(cpSheet(spreadsheet), "cp");
+  conta(smSheet(spreadsheet), "sm");
+  return Array.from(resumo.values()).sort((a, b) =>
+    Number(a.nte.replace(/\D/g, "")) - Number(b.nte.replace(/\D/g, "")));
+}
+/* Aba MONITORAMENTO: resumo por NTE (coordenadores de polo validados e municípios
+   com supervisor cadastrado), com total por NTE e totais gerais. Cria a aba se não
+   existir e é chamada no fim de cada gravação bem-sucedida do webhook. */
+function atualizarMonitoramento(spreadsheet) {
+  spreadsheet = spreadsheet || SpreadsheetApp.openById(SPREADSHEET_ID);
+  const dados = montarMonitor(spreadsheet);
+  const nomeAba = "MONITORAMENTO";
+  let aba = spreadsheet.getSheetByName(nomeAba);
+  if (!aba) aba = spreadsheet.insertSheet(nomeAba);
+  else aba.clear();
+  const timeZone = spreadsheet.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  const fmt = "dd/MM/yyyy HH:mm:ss";
+  const headers = ["NTE", "COORDENADORES DE POLO VALIDADOS", "MUNICÍPIOS SM CADASTRADOS", "TOTAL", "ÚLTIMA VALIDAÇÃO CP", "ÚLTIMO CADASTRO SM"];
+  const linhas = dados.map(d => [
+    d.nte, d.cp, d.sm, d.cp + d.sm,
+    d.ultimoCp !== null ? Utilities.formatDate(new Date(d.ultimoCp), timeZone, fmt) : "",
+    d.ultimoSm !== null ? Utilities.formatDate(new Date(d.ultimoSm), timeZone, fmt) : "",
+  ]);
+  const totCp = dados.reduce((soma, d) => soma + d.cp, 0);
+  const totSm = dados.reduce((soma, d) => soma + d.sm, 0);
+  linhas.push(["TOTAL", totCp, totSm, totCp + totSm, "", ""]);
+  aba.getRange(1, 1, 1, headers.length).setValues([headers]);
+  aba.getRange(2, 1, linhas.length, headers.length).setValues(linhas);
+  aba.getRange(1, 1, 1, headers.length).setFontWeight("bold");
+  aba.getRange(linhas.length + 1, 1, 1, headers.length).setFontWeight("bold");
+  aba.setFrozenRows(1);
+  return { ok: true, atualizadoEm: Utilities.formatDate(new Date(), timeZone, fmt), ntEs: dados.length };
+}
 function doGet() { return response({ ok: false, code: "UNAUTHORIZED" }); }
 /* Rode esta função UMA VEZ no editor do Apps Script (menu Executar) para apagar
    as abas de saída antigas. Não é chamada automaticamente. */
@@ -306,6 +376,29 @@ function removerAbasSaida() {
 /* Use no editor para FORÇAR a migração da INSCRICOES CP para a CP- SABE de novo. */
 function migrarAgora() {
   return migrarInscricoesParaCpSabe(SpreadsheetApp.openById(SPREADSHEET_ID), true);
+}
+/* Corrige na planilha os horários de ATUALIZADO gravados em UTC (ISO "...Z") para
+   o fuso local (Brasília). Execute UMA VEZ no editor (menu Executar →
+   corrigirHorariosAtualizado) após publicar esta versão — não é chamada pelo webhook.
+   Converte apenas células que pareçam ISO UTC; células já corretas são ignoradas. */
+function corrigirHorariosAtualizado() {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const corrigidas = [];
+  [["CP- SABE ", CP_FIELDS], [SM_SHEET, SM_FIELDS]].forEach(([nome, fields]) => {
+    const info = sheetInfo(spreadsheet, nome, fields);
+    if (!info || info.map.atualizado < 0 || info.sheet.getLastRow() < 2) return;
+    const values = info.sheet.getRange(2, info.map.atualizado + 1, info.sheet.getLastRow() - 1, 1).getValues();
+    let mudou = 0;
+    values.forEach((coluna, index) => {
+      const valor = coluna[0];
+      if (typeof valor === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(valor.trim())) {
+        info.sheet.getRange(index + 2, info.map.atualizado + 1).setValue(localTimestamp(valor.trim(), spreadsheet));
+        mudou += 1;
+      }
+    });
+    if (mudou > 0) corrigidas.push(nome + ": " + mudou + " célula(s)");
+  });
+  return { ok: true, corrigidas };
 }
 function doPost(event) {
   let data;
@@ -346,6 +439,7 @@ function doPost(event) {
       if (data.acao === "editar" && !validAdicionais(data.adicionais, current.adicionais)) return response({ ok: false, code: "INVALID" });
       // Unica fonte da validacao de CP: a propria aba oficial. INSCRICOES CP nao e mais usada.
       updateCpRow(spreadsheet, current, data);
+      try { atualizarMonitoramento(spreadsheet); } catch (monitorError) {}
       return response({ ok: true });
     }
     // SM: grava na aba oficial SM-SABE, na linha do NTE + município.
@@ -369,6 +463,7 @@ function doPost(event) {
       data.documento = documento.url;
     }
     updateSmRow(spreadsheet, sm, offset + 2, data);
+    try { atualizarMonitoramento(spreadsheet); } catch (monitorError) {}
     return response({ ok: true });
   } catch (error) {
     return response({ ok: false, code: "INTERNAL", error: String(error && error.message ? error.message : error) });

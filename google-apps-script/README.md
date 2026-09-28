@@ -33,3 +33,27 @@ em base64 e repassado ao Apps Script. O script salva o PDF (máximo 4 MB) em uma
 do Google Drive com o **nome do município**, dentro da pasta definida em
 `SABE_DRIVE_FOLDER_ID`, e grava a URL do arquivo na coluna **DOCUMENTO** da `SM-SABE`.
 Sem `arquivoBase64` o cadastro do SM é recusado com HTTP 400.
+
+## Corrigir horários antigos da coluna ATUALIZADO
+
+Validações feitas até a versão `2026-09-25-supabase` gravaram **UTC** (ex.:
+`2026-09-25T23:07:35.658Z`) na coluna ATUALIZADO — 3 horas à frente do horário de
+Brasília. Depois de publicar a nova versão, rode **uma vez** no editor do Apps Script:
+`Executar → corrigirHorariosAtualizado`. Ela converte apenas as células com formato
+ISO UTC para `dd/MM/yyyy HH:mm:ss` (fuso da planilha) e retorna quantas corrigiu
+por aba (`CP- SABE ` e `SM-SABE`). Não é chamada pelo webhook.
+
+## Aba MONITORAMENTO (cadastrados por NTE)
+
+`atualizarMonitoramento()` cria/atualiza a aba **MONITORAMENTO**: uma linha por NTE
+com os polos de Coordenador de Polo validados (coluna VALIDADO/ALTERADO FORM da
+`CP- SABE `), os municípios com Supervisor Municipal cadastrado (mesma coluna da
+`SM-SABE`), o total por NTE e o horário da última validação/cadastro de cada tipo
+(convertido para o fuso da planilha). NTEs sem cadastro aparecem com zero, e a
+última linha traz os totais gerais.
+
+A aba é **criada automaticamente** ao fim de cada gravação bem-sucedida do webhook
+(validar/editar/alterar do CP e cadastrar do SM) e também pode ser gerada sob
+demanda no editor: `Executar → atualizarMonitoramento`. Ela lê todas as linhas das
+duas abas oficiais, então reflete a planilha como está — sem políticas de exclusão
+nem histórico.
