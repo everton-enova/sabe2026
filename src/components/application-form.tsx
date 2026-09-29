@@ -7,7 +7,7 @@ import { BotCheck } from "@/components/bot-check";
 import { Coordinator, Details, detailLabels, emptyDetails } from "@/lib/cp";
 
 type Mode = "cp" | "sm";
-type Stage = "selection" | "candidate" | "conference" | "form" | "review" | "success";
+type Stage = "selection" | "candidate" | "conference" | "form" | "replace-document" | "review" | "success";
 
 const onlyDigits = (value: string) => String(value || "").replace(/\D/g, "");
 
@@ -110,7 +110,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [nte, setNte] = useState("");
   const [place, setPlace] = useState("");
   const [details, setDetails] = useState<Details>(emptyDetails);
-  const [action, setAction] = useState<"validar" | "editar" | "alterar" | "cadastrar">(isCp ? "validar" : "cadastrar");
+  const [action, setAction] = useState<"validar" | "editar" | "alterar" | "cadastrar" | "substituir-documento">(isCp ? "validar" : "cadastrar");
   const [accepted, setAccepted] = useState(false);
   const [bankChoice, setBankChoice] = useState("");
   const [bankSearch, setBankSearch] = useState("");
@@ -128,6 +128,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const needsBotCheck = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
   const [validatedPlaces, setValidatedPlaces] = useState<string[]>([]);
+  const [substituirPlaces, setSubstituirPlaces] = useState<string[]>([]);
   const [nteValidated, setNteValidated] = useState<string[]>([]);
   const [perNteFallback, setPerNteFallback] = useState(false);
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
@@ -165,8 +166,20 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             return "";
           })
           .filter(Boolean));
+        // SM também informa os municípios que precisam trocar o ofício inválido.
+        const substituir = Array.isArray(result.substituir) ? result.substituir : [];
+        setSubstituirPlaces(substituir
+          .map((item) => {
+            if (item && typeof item === "object") {
+              const entry = item as { nte?: unknown; polo?: unknown; municipio?: unknown };
+              const local = typeof entry.polo === "string" ? entry.polo : typeof entry.municipio === "string" ? entry.municipio : "";
+              if (local) return placeKey(String(entry.nte ?? ""), local);
+            }
+            return "";
+          })
+          .filter(Boolean));
       } catch {
-        if (ativo) { setPerNteFallback(true); setValidatedPlaces([]); }
+        if (ativo) { setPerNteFallback(true); setValidatedPlaces([]); setSubstituirPlaces([]); }
       } finally {
         if (ativo) setLoadingValidated(false);
       }
@@ -212,11 +225,13 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     const placesList = unique(
       (isCp ? data.coordinators.filter((item) => item.nte === nte).map((item) => item.polo) : data.locations.filter((item) => item.nte === nte).map((item) => item.municipio))
     );
-    return placesList.map(p => ({
-      name: p,
-      isDisabled: validatedPlaces.includes(placeKey(nte, p)) || nteValidated.includes(normalized(p))
-    }));
-  }, [isCp, nte, validatedPlaces, nteValidated]);
+    return placesList.map(p => {
+      const key = placeKey(nte, p);
+      const isSubstituir = !isCp && substituirPlaces.includes(key);
+      const isDisabled = !isSubstituir && (validatedPlaces.includes(key) || nteValidated.includes(normalized(p)));
+      return { name: p, isDisabled, isSubstituir };
+    });
+  }, [isCp, nte, validatedPlaces, nteValidated, substituirPlaces]);
 
   const matchingBanks = useMemo(() => {
     const query = bankSearch.trim().toLocaleLowerCase("pt-BR");
@@ -230,12 +245,23 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   }, [bankChoice, bankSearch, details.tipoConta]);
 
   const placeLabel = isCp ? "Polo" : "Município";
-  const stageNumber = stage === "selection" ? 1 : stage === "candidate" || stage === "conference" || stage === "form" ? 2 : 3;
+  const stageNumber = stage === "selection" ? 1 : stage === "candidate" || stage === "conference" || stage === "form" || stage === "replace-document" ? 2 : 3;
 
   async function selectLocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
     if (!nte || !place || busy.current) return;
+
+    // Municípios com ofício inválido liberados para trocar apenas o documento.
+    if (!isCp && substituirPlaces.includes(placeKey(nte, place))) {
+      setAction("substituir-documento");
+      setDetails(emptyDetails);
+      setArquivo(null);
+      setArquivoErro("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setStage("replace-document");
+      return;
+    }
 
     if (validatedPlaces.includes(placeKey(nte, place)) || nteValidated.includes(normalized(place))) {
       setMessage("Este polo já foi validado e não está mais disponível para alteração.");
@@ -359,18 +385,30 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     else setStage("review");
   }
 
+  function reviewReplace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    if (!arquivo) {
+      setMessage("Anexe o novo ofício em PDF antes de revisar o envio.");
+      return;
+    }
+    setAccepted(false);
+    setStage("review");
+  }
+
   async function submit() {
     if (!accepted || busy.current) return;
     busy.current = true;
     setSubmitting(true);
     setMessage("");
     try {
+      const isReplace = action === "substituir-documento";
       const payload = {
         modalidade: mode.toUpperCase(),
         acao: action,
         nte,
         local: place,
-        ...details,
+        ...(isReplace ? {} : details),
         ...(isCp ? { registro: coordinator?.registro, versao: coordinator?.versao } : {}),
         ...(action === "editar" ? { adicionais: additional } : {}),
         turnstileToken,
@@ -406,6 +444,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       setStage("success");
       // O polo/município recém-validado já entra na lista, para aparecer marcado se voltar.
       setValidatedPlaces(prev => prev.includes(placeKey(nte, place)) ? prev : [...prev, placeKey(nte, place)]);
+      // Documento substituído: sai da lista de pendências de troca.
+      setSubstituirPlaces(prev => prev.filter(key => key !== placeKey(nte, place)));
     } catch (error) {
       // Token do Turnstile e de uso unico: descarta e remonta o widget para o proximo envio.
       setTurnstileToken("");
@@ -513,7 +553,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                   <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
                   {places.map((item) => (
                     <option key={item.name} value={item.name} disabled={item.isDisabled}>
-                      {item.name}{item.isDisabled ? (isCp ? " — já validado ✓" : " — já cadastrado ✓") : ""}
+                      {item.name}{item.isDisabled ? (isCp ? " — já validado ✓" : " — já cadastrado ✓") : item.isSubstituir ? " — substituir documento ⚠️" : ""}
                     </option>
                   ))}
                 </select>
@@ -576,15 +616,20 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <label>Telefone<input name="telefone" type="tel" inputMode="tel" autoComplete="tel" value={details.telefone} onChange={(event) => setDetails({ ...details, telefone: formatPhone(event.target.value) })} placeholder="(71) 99999-9999" required={action !== "editar"} /></label>
               <label>CPF<input name="cpf" inputMode="numeric" autoComplete="off" value={details.cpf} onChange={(event) => setDetails({ ...details, cpf: formatCpf(event.target.value) })} placeholder="000.000.000-00" required /></label>
               <label>Tem experiência em avaliação
-                <select name="experiencia" value={details.experiencia || ""} onChange={(event) => setDetails({ ...details, experiencia: event.target.value })} required={action !== "editar"}>
+                <select name="experiencia" value={details.experiencia || ""} onChange={(event) => {
+                  const experiencia = event.target.value;
+                  setDetails({ ...details, experiencia, funcao: experiencia === "Sim" ? details.funcao : "" });
+                }} required={action !== "editar"}>
                   <option value="">Selecione</option>
                   <option value="Sim">Sim</option>
                   <option value="Não">Não</option>
                 </select>
               </label>
-              <label>Função que já exerceu
-                <input name="funcao" value={details.funcao} onChange={(event) => setDetails({ ...details, funcao: event.target.value.toUpperCase() })} placeholder="Ex: COORDENADOR, APLICADOR" required={action !== "editar"} />
-              </label>
+              {details.experiencia === "Sim" && (
+                <label>Função que já exerceu
+                  <input name="funcao" value={details.funcao} onChange={(event) => setDetails({ ...details, funcao: event.target.value.toUpperCase() })} placeholder="Ex: COORDENADOR, APLICADOR" required={action !== "editar"} />
+                </label>
+              )}
             </div></fieldset>
 
             <fieldset><legend>Dados bancários</legend>
@@ -727,18 +772,50 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           </form>
         )}
 
+        {stage === "replace-document" && (
+          <form onSubmit={reviewReplace}>
+            <div className="section-heading"><span>02</span><div><h2>Substituir documento</h2><p>O documento enviado anteriormente está inválido. Anexe o novo ofício para substituí-lo.</p></div></div>
+            <div className="location-summary"><span>{nte}</span><strong>{place}</strong><button type="button" onClick={resetSelection}>Trocar município</button></div>
+            <div className="attention-block">
+              <p><strong>⚠️ ATENÇÃO:</strong> A substituição apaga o documento anterior e mantém os dados do cadastro já informados. Envie apenas o novo ofício ou e-mail da Secretaria em PDF.</p>
+            </div>
+            <fieldset><legend>Novo documento</legend>
+              <p className="field-help">Aceitamos apenas arquivo em PDF de até 4 MB. O novo documento substituirá o anterior na pasta do município.</p>
+              <label className="upload-box">
+                <input
+                  ref={fileInputRef}
+                  name="arquivo"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={handleFile}
+                  required
+                />
+                <span className="upload-icon" aria-hidden="true">↑</span>
+                <span className="upload-title">{arquivo ? "Trocar o documento" : "Selecionar o novo documento em PDF"}</span>
+                <span className="upload-hint">Clique para escolher o arquivo do seu dispositivo</span>
+              </label>
+              {arquivo && <p className="upload-file">Anexo selecionado: <strong>{arquivo.name}</strong> ({(arquivo.size / 1024 / 1024).toFixed(2)} MB)</p>}
+              {arquivoErro && <p className="form-message error" role="alert">{arquivoErro}</p>}
+            </fieldset>
+            {message && <p className="form-message error" role="alert">{message}</p>}
+            <div className="form-actions split"><button className="button secondary" type="button" onClick={resetSelection}>Cancelar</button><button className="button primary" type="submit">Revisar e enviar<span>→</span></button></div>
+          </form>
+        )}
+
         {stage === "review" && (
           <div>
-            <div className="section-heading"><span>03</span><div><h2>Revise antes de enviar</h2><p>Depois da confirmação, este formulário ficará indisponível para alterações.</p></div></div>
+            <div className="section-heading"><span>03</span><div><h2>{action === "substituir-documento" ? "Revise a substituição do documento" : "Revise antes de enviar"}</h2><p>Depois da confirmação, este formulário ficará indisponível para alterações.</p></div></div>
             <div className="review-block"><h3>Localização</h3><dl><div><dt>NTE</dt><dd>{nte}</dd></div><div><dt>{placeLabel}</dt><dd>{place}</dd></div></dl></div>
-            <div className="review-block"><h3>{isCp && action === "validar" ? "Indicação validada" : "Responsável"}</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details] || key}</dt><dd>{value || "Não informado"}</dd></div>)}</dl></div>
-            {!isCp && (
-              <div className="review-block"><h3>Documento anexado</h3><dl><div><dt>Arquivo</dt><dd>{arquivo ? arquivo.name : "Nenhum arquivo anexado"}</dd></div></dl></div>
+            {action !== "substituir-documento" && (
+              <div className="review-block"><h3>{isCp && action === "validar" ? "Indicação validada" : "Responsável"}</h3><dl>{Object.entries(details).map(([key, value]) => <div key={key}><dt>{detailLabels[key as keyof Details] || key}</dt><dd>{value || "Não informado"}</dd></div>)}</dl></div>
             )}
-            <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio.</span></label>
+            {!isCp && (
+              <div className="review-block"><h3>{action === "substituir-documento" ? "Novo documento" : "Documento anexado"}</h3><dl><div><dt>Arquivo</dt><dd>{arquivo ? arquivo.name : "Nenhum arquivo anexado"}</dd></div></dl></div>
+            )}
+            <label className="confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>{action === "substituir-documento" ? "Confirmo que o novo documento substituirá o anterior." : "Confirmo que revisei os dados e estou ciente de que não poderei alterá-los após o envio."}</span></label>
             {needsBotCheck && <BotCheck key={botAttempt} action="sabe-envio" onToken={setTurnstileToken} />}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken) || (!isCp && !arquivo)} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
+            <div className="form-actions split"><button className="button secondary" type="button" disabled={submitting} onClick={() => { setAccepted(false); setStage(action === "substituir-documento" ? "replace-document" : isCp && (action === "validar" || action === "editar") ? "conference" : "form"); }}>Voltar e corrigir</button><button className="button primary" type="button" disabled={!accepted || submitting || (needsBotCheck && !turnstileToken) || (!isCp && !arquivo)} onClick={submit}>{submitting ? "Enviando..." : "Confirmar e enviar"}</button></div>
           </div>
         )}
 

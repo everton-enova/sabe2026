@@ -45,6 +45,7 @@ const SM_FIELDS = {
   operacao: ["OPERAÇÃO", "OPERACAO", "VARIAÇÃO/OPERAÇÃO"],
   pix: ["CHAVE PIX", "PIX"],
   documento: ["DOCUMENTO", "LINK DO DOCUMENTO", "ARQUIVO", "OFÍCIO", "OFICIO", "ANEXO"],
+  revisar: ["REVISAR DOCUMENTO"],
   atualizado: ["ATUALIZADO"],
   validado: ["VALIDADO/ALTERADO FORM", "VALIDADO", "VALIDADO/ALTERADO"],
 };
@@ -161,6 +162,22 @@ function updateSmRow(spreadsheet, sm, rowNumber, data) {
   if (!(rowNumber >= 2)) throw new Error("Número da linha inválido: " + rowNumber);
   writeValidatedRow(sm, rowNumber, data, SM_DATA_FIELDS);
 }
+/* SM: substituição do ofício — grava apenas o documento e limpa a marcação
+   de revisão, mantendo os dados do supervisor já cadastrados. */
+function updateSmDocumento(info, rowNumber, data) {
+  if (!info) throw new Error("Aba SM-SABE não encontrada.");
+  if (!(rowNumber >= 2)) throw new Error("Número da linha inválido: " + rowNumber);
+  const errors = [];
+  const write = (column, value) => {
+    if (column < 0) return;
+    try { info.sheet.getRange(rowNumber, column + 1).setValue(textCell(value)); }
+    catch (e) { errors.push("col " + (column + 1) + ": " + e.message); }
+  };
+  write(info.map.documento, data.documento);
+  write(info.map.atualizado, localTimestamp(data.enviadoEm, info.sheet.getParent()));
+  write(info.map.revisar, "");
+  if (errors.length) throw new Error("Erro ao gravar: " + errors.join("; "));
+}
 /* SM: grava o oficio/e-mail em PDF na pasta Drive do municipio.
    A pasta raiz vem da propriedade SABE_DRIVE_FOLDER_ID; sem ela, cria/usa
    "SABE 2026 - Documentos SM" na raiz do Drive de quem executa o script. */
@@ -193,6 +210,20 @@ function salvarDocumentoSm(data) {
   try { file = pasta.createFile(blob); }
   catch (e) { return { falha: true, motivo: "createFile: " + e.message }; }
   return { url: file.getUrl(), id: file.getId(), nome: file.getName() };
+}
+/* Extrai o ID do arquivo do Google Drive a partir da URL gravada na coluna DOCUMENTO. */
+function extrairDriveFileId(url) {
+  const m = String(url || "").match(/(?:\/d\/|id=)([\w-]{10,})/);
+  return m ? m[1] : "";
+}
+/* Apaga o arquivo anterior do Drive (fallback sem Supabase) antes de gravar o novo link. */
+function apagarDocumentoAntigo(sm, rowNumber) {
+  if (!sm || sm.map.documento < 0) return;
+  const cells = sm.sheet.getRange(rowNumber, sm.map.documento + 1, 1, 1).getDisplayValues();
+  const url = String((cells[0] && cells[0][0]) || "");
+  const id = extrairDriveFileId(url);
+  if (!id) return;
+  try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* arquivo já ausente ou sem permissão: segue */ }
 }
 function validatedPolos(spreadsheet, nte) {
   const cp = cpSheet(spreadsheet);
@@ -421,7 +452,8 @@ function doPost(event) {
     return response({ ok: true, versao: CODE_VERSION, validated: validatedPolos(spreadsheet, data.nte) });
   }
   const cp = data.modalidade === "CP";
-  if (!(cp && ["validar", "editar", "alterar"].includes(data.acao)) && !(data.modalidade === "SM" && data.acao === "cadastrar")) return response({ ok: false, code: "INVALID" });
+  const substituirDocumento = data.modalidade === "SM" && data.acao === "substituir-documento";
+  if (!(cp && ["validar", "editar", "alterar"].includes(data.acao)) && !(data.modalidade === "SM" && ["cadastrar", "substituir-documento"].includes(data.acao))) return response({ ok: false, code: "INVALID" });
   if (!data.nte || !data.local) return response({ ok: false, code: "INVALID" });
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return response({ ok: false, code: "BUSY" });
@@ -450,7 +482,28 @@ function doPost(event) {
     const rows = sm.sheet.getRange(2, 1, sm.sheet.getLastRow() - 1, sm.columns).getDisplayValues();
     const offset = rows.findIndex(row => nteNumber(row[nteColumn]) === nteNumber(data.nte) && normalized(row[municipioColumn]) === normalized(data.local));
     if (offset < 0) return response({ ok: false, code: "NOT_FOUND" });
-    if (sm.map.validado >= 0 && String(rows[offset][sm.map.validado] || "").trim()) return response({ ok: false, code: "DUPLICATE" });
+    const rowNumber = offset + 2;
+    const jaCadastrado = sm.map.validado >= 0 ? String(rows[offset][sm.map.validado] || "").trim() : "";
+    const temNome = sm.map.nome >= 0 ? String(rows[offset][sm.map.nome] || "").trim() : "";
+
+    if (substituirDocumento) {
+      // Só substitui em municípios que já têm cadastro (validado ou com nome).
+      if (!jaCadastrado && !temNome) return response({ ok: false, code: "NOT_FOUND" });
+      if (data.documentoUrl) {
+        data.documento = data.documentoUrl;
+      } else {
+        const documento = salvarDocumentoSm(data);
+        if (documento && documento.falha) return response({ ok: false, code: "UPLOAD_FAILED", error: documento.motivo });
+        if (!documento || !documento.url) return response({ ok: false, code: "UPLOAD_FAILED", error: "retorno vazio do salvarDocumentoSm" });
+        apagarDocumentoAntigo(sm, rowNumber);
+        data.documento = documento.url;
+      }
+      updateSmDocumento(sm, rowNumber, data);
+      try { atualizarMonitoramento(spreadsheet); } catch (monitorError) {}
+      return response({ ok: true });
+    }
+
+    if (jaCadastrado) return response({ ok: false, code: "DUPLICATE" });
     // Documento vem do Supabase Storage (URL publica) ou do fallback base64 -> Drive.
     if (data.documentoUrl) {
       data.documento = data.documentoUrl;
@@ -462,7 +515,7 @@ function doPost(event) {
       if (!documento || !documento.url) return response({ ok: false, code: "UPLOAD_FAILED", error: "retorno vazio do salvarDocumentoSm" });
       data.documento = documento.url;
     }
-    updateSmRow(spreadsheet, sm, offset + 2, data);
+    updateSmRow(spreadsheet, sm, rowNumber, data);
     try { atualizarMonitoramento(spreadsheet); } catch (monitorError) {}
     return response({ ok: true });
   } catch (error) {

@@ -1,7 +1,7 @@
 import { ApiError, failure, json, readRequest } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
 import { verifyTurnstile } from "@/lib/turnstile";
-import { bucketEnabled, uploadDocumento } from "@/lib/supabase";
+import { bucketEnabled, replaceDocumento, uploadDocumento } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,16 +89,19 @@ export async function POST(request: Request) {
       if (Math.floor(arquivoBase64.length * 3 / 4) > MAX_PDF_BYTES) throw new ApiError(413, "O documento deve ter no máximo 4 MB.");
     }
     const cp = payload.modalidade === "CP";
-    const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && payload.acao === "cadastrar");
+    const substituirDocumento = payload.modalidade === "SM" && payload.acao === "substituir-documento";
+    const validFlow = (cp && ["validar", "editar", "alterar"].includes(String(payload.acao))) || (payload.modalidade === "SM" && ["cadastrar", "substituir-documento"].includes(String(payload.acao)));
     if (!validFlow) throw new ApiError(400, "Modalidade ou ação inválida.");
     const remoteIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
     await verifyTurnstile(payload.turnstileToken, remoteIp);
     validateLocation(payload.modalidade, payload.nte, payload.local);
     const required = cp && payload.acao === "validar" ? requiredBase
-      : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"] : [...requiredBase, ...requiredDetails];
+      : cp && payload.acao === "editar" ? [...requiredBase, "nome", "cpf"]
+      : substituirDocumento ? requiredBase
+      : [...requiredBase, ...requiredDetails];
     if (required.some(field => !hasText(payload, field))) throw new ApiError(400, "Preencha todos os campos obrigatórios.");
-    if (payload.modalidade === "SM" && !arquivoBase64) throw new ApiError(400, "Anexe o documento em PDF para concluir o cadastro.");
-    if (!(cp && payload.acao === "validar")) {
+    if (payload.modalidade === "SM" && !arquivoBase64) throw new ApiError(400, "Anexe o documento em PDF para concluir o envio.");
+    if (!(cp && payload.acao === "validar") && !substituirDocumento) {
       if ((hasText(payload, "email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payload.email))) || (hasText(payload, "telefone") && ![10, 11].includes(onlyDigits(payload.telefone).length)) || !validCpf(payload.cpf)) {
         throw new ApiError(400, "Confira o e-mail, o telefone e o CPF informados.");
       }
@@ -126,11 +129,17 @@ export async function POST(request: Request) {
     if (payload.modalidade === "SM") {
       if (USE_SUPABASE_STORAGE && bucketEnabled()) {
         const buffer = Buffer.from(arquivoBase64, "base64");
-        const documentoUrl = await uploadDocumento(
-          { name: arquivoNome, type: arquivoTipo, buffer },
-          String(payload.nte),
-          String(payload.local)
-        );
+        const documentoUrl = substituirDocumento
+          ? await replaceDocumento(
+              { name: arquivoNome, type: arquivoTipo, buffer },
+              String(payload.nte),
+              String(payload.local)
+            )
+          : await uploadDocumento(
+              { name: arquivoNome, type: arquivoTipo, buffer },
+              String(payload.nte),
+              String(payload.local)
+            );
         submission.documentoUrl = documentoUrl;
       } else {
         // Fallback: envia base64 para o Apps Script salvar no Drive.

@@ -52,3 +52,34 @@ export async function uploadDocumento(
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
+
+/* Substitui o documento de um município no Supabase Storage, sobrescrevendo
+   o arquivo no mesmo path determinístico (sem timestamp). Usado no fluxo
+   "substituir-documento" do SM quando o ofício anterior está inválido. */
+export async function replaceDocumento(
+  arquivo: { name: string; type: string; buffer: Buffer },
+  nte: string,
+  municipio: string
+) {
+  if (!supabase) throw new Error("Supabase não configurado.");
+  const bucket = "sabe2026-documentos";
+  const safeMunicipio = String(municipio || "SEM_MUNICIPIO")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "_")
+    .toUpperCase();
+  // Path determinístico: sobrescreve o documento do município.
+  const path = `NTE_${String(nte).replace(/\D/g, "")}/${safeMunicipio}/documento.pdf`;
+
+  const { error } = await supabase.storage.from(bucket).upload(path, arquivo.buffer, {
+    contentType: arquivo.type || "application/pdf",
+    upsert: true,
+  });
+  if (error) throw new Error(`Upload falhou: ${error.message}`);
+
+  const { data: info, error: infoError } = await supabase.storage.from(bucket).info(path);
+  if (infoError || !info) throw new Error(`Upload não confirmado no Storage: ${infoError?.message || "objeto ausente"}`);
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}

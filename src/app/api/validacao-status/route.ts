@@ -32,9 +32,11 @@ function normalized(value: unknown) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
 }
 
-/* Le a aba pública SM-SABE: municipios com a coluna VALIDADO/ALTERADO FORM (16)
-   ou NOME (3) preenchidas sao considerados ja cadastrados e ficam bloqueados
-   no formulario. E a leitura publica, sem depender do Apps Script. */
+/* Le a aba pública SM-SABE: municipios com a coluna VALIDADO/ALTERADO FORM
+   ou NOME preenchidas sao considerados ja cadastrados e ficam bloqueados
+   no formulario — a menos que a coluna REVISAR DOCUMENTO esteja marcada com "SIM",
+   caso em que o municipio aparece na lista substituir para trocar o oficio.
+   E a leitura publica, sem depender do Apps Script. */
 export async function loadValidatedSmMunicipios(nte?: string) {
   const endpoint = new URL(`https://docs.google.com/spreadsheets/d/${SM_SHEET_ID}/gviz/tq`);
   endpoint.searchParams.set("tqx", "out:csv");
@@ -48,11 +50,23 @@ export async function loadValidatedSmMunicipios(nte?: string) {
   const idxMun = Math.max(headers.findIndex(h => normalized(h) === "MUNICÍPIO" || normalized(h) === "MUNICIPIO"), 2);
   const idxNome = headers.findIndex(h => normalized(h) === "NOME");
   const idxValidado = headers.findIndex(h => normalized(h) === "VALIDADO/ALTERADO FORM" || normalized(h) === "VALIDADO");
-  return rows.slice(1)
-    .filter(row => String(row[idxMun] || "").trim()
-      && (String(row[idxValidado] || "").trim() || String(row[idxNome] || "").trim())
-      && (!nte || nteNumber(row[idxNte]) === nteNumber(nte)))
-    .map(row => ({ nte: nteNumber(row[idxNte]), municipio: normalized(row[idxMun]) }));
+  const idxRevisar = headers.findIndex(h => normalized(h) === "REVISAR DOCUMENTO");
+  const cadastrados: { nte: string; municipio: string }[] = [];
+  const substituir: { nte: string; municipio: string }[] = [];
+  rows.slice(1).forEach(row => {
+    const nomeMun = String(row[idxMun] || "").trim();
+    if (!nomeMun) return;
+    const numNte = nteNumber(row[idxNte]);
+    if (nte && numNte !== nteNumber(nte)) return;
+    const jaCadastrado = Boolean(String(row[idxValidado] || "").trim() || String(row[idxNome] || "").trim());
+    const revisar = idxRevisar >= 0 && /^sim$/i.test(String(row[idxRevisar] || "").trim());
+    const municipio = normalized(row[idxMun]);
+    if (jaCadastrado) {
+      if (revisar) substituir.push({ nte: numNte, municipio });
+      cadastrados.push({ nte: numNte, municipio });
+    }
+  });
+  return { cadastrados, substituir };
 }
 
 /* Sem ?nte devolve todos os polos validados (pre-carregamento da pagina).
@@ -66,11 +80,11 @@ export async function GET(request: Request) {
   const escopo = nte ? "nte" : "global";
   if (searchParams.get("mode") === "sm") {
     try {
-      const validated = await loadValidatedSmMunicipios(nte ?? undefined);
-      return json({ validated, escopo });
+      const { cadastrados, substituir } = await loadValidatedSmMunicipios(nte ?? undefined);
+      return json({ validated: cadastrados, substituir, escopo });
     } catch (error) {
       console.error("SABE validacao-status SM", error);
-      return json({ validated: [], escopo, falha: true });
+      return json({ validated: [], substituir: [], escopo, falha: true });
     }
   }
   if (searchParams.get("mode") !== "cp") return json({ validated: [], escopo });
