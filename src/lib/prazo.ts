@@ -1,13 +1,13 @@
 /* Prazo de validação do formulário SABE 2026.
 
-   Controle pelo ambiente (Vercel ou .env):
-   - NEXT_PUBLIC_SABE_PRAZO_FIM=""          -> sem prazo (formulário sempre aberto).
-   - NEXT_PUBLIC_SABE_PRAZO_FIM=HOJE_2359   -> hoje às 23:59 (horário da Bahia).
+   Por padrão (sem a variável), o prazo é HOJE às 23:59 (horário da Bahia).
+   Para definir um prazo exato — ou reabrir por um período — use:
+   - NEXT_PUBLIC_SABE_PRAZO_FIM=HOJE_2359                -> hoje às 23:59 (Bahia).
    - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59:00-03:00 -> data/hora exata.
-   - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59 (sem fuso) -> interpretado como Bahia (-03:00).
+   - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59 (sem fuso) -> Bahia (-03:00).
 
-   Para voltar ao ar depois de encerrado, troque a variável por um prazo futuro
-   (ou por HOJE_2359 para encerrar hoje) e faça redeploy. */
+   Depois que o prazo passa, o formulário fica bloqueado até você definir um
+   novo prazo futuro (e fazer redeploy). */
 
 // Bahia = America/Bahia, UTC-3, sem horário de verão.
 const BAHIA_OFFSET_MS = -3 * 60 * 60 * 1000;
@@ -44,8 +44,10 @@ export function resolveDeadline(raw: string | undefined): Date | null {
   return parseValue(String(raw || ""));
 }
 
-export function getDeadline(): Date | null {
-  return resolveDeadline(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM);
+export function getDeadline(): Date {
+  const raw = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM || "").trim();
+  // Sem variável (ou valor inválido), o padrão é hoje às 23:59 na Bahia.
+  return resolveDeadline(raw) ?? hojeAs2359();
 }
 
 export function isExpired(deadline: Date | null, now: number = Date.now()): boolean {
