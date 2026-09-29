@@ -6,6 +6,10 @@
    - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59:00-03:00 -> data/hora exata.
    - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59 (sem fuso) -> Bahia (-03:00).
 
+   Cada formulário pode ter seu próprio prazo, sobrepondo o geral:
+   - NEXT_PUBLIC_SABE_PRAZO_FIM_SM -> exclusivo do formulário SM.
+   - NEXT_PUBLIC_SABE_PRAZO_FIM_CP -> exclusivo do formulário CP.
+
    Depois que o prazo passa, o formulário fica bloqueado até você definir um
    novo prazo futuro (e fazer redeploy). */
 
@@ -44,7 +48,19 @@ export function resolveDeadline(raw: string | undefined): Date | null {
   return parseValue(String(raw || ""));
 }
 
-export function getDeadline(): Date {
+/* Formulário ao qual o prazo se aplica. Cada modo pode ter uma variável
+   própria (NEXT_PUBLIC_SABE_PRAZO_FIM_CP / _SM) que sobrepõe o prazo geral. */
+export type PrazoMode = "cp" | "sm";
+
+export function getDeadline(mode?: PrazoMode): Date {
+  // Prazo específico do formulário tem prioridade sobre o prazo geral.
+  if (mode) {
+    const rawMode = String(
+      (mode === "sm" ? process.env.NEXT_PUBLIC_SABE_PRAZO_FIM_SM : process.env.NEXT_PUBLIC_SABE_PRAZO_FIM_CP) || ""
+    ).trim();
+    const specific = parseValue(rawMode);
+    if (specific) return specific;
+  }
   const raw = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM || "").trim();
   // Sem variável (ou valor inválido), o padrão é hoje às 23:59 na Bahia.
   return resolveDeadline(raw) ?? hojeAs2359();

@@ -1,8 +1,8 @@
-import { formatDeadline, getDeadline } from "@/lib/prazo";
+import { formatDeadline, getDeadline, PrazoMode } from "@/lib/prazo";
 
 /* Caixa exibida quando o prazo de validação terminou. */
-export function PrazoEncerradoBox() {
-  const deadline = getDeadline();
+export function PrazoEncerradoBox({ mode }: { mode?: PrazoMode }) {
+  const deadline = getDeadline(mode);
   return (
     <section className="form-shell">
       <div className="prazo-encerrado-box">
@@ -17,7 +17,7 @@ export function PrazoEncerradoBox() {
 }
 
 /* Página completa usada pelas rotas /aplicacao/cp e /aplicacao/sm. */
-export function PrazoEncerrado({ titulo }: { titulo: string }) {
+export function PrazoEncerrado({ titulo, mode }: { titulo: string; mode?: PrazoMode }) {
   return (
     <main className="form-page">
       <section className="form-intro">
@@ -27,7 +27,7 @@ export function PrazoEncerrado({ titulo }: { titulo: string }) {
           <p>O formulário está temporariamente indisponível para novos envios e alterações.</p>
         </div>
       </section>
-      <PrazoEncerradoBox />
+      <PrazoEncerradoBox mode={mode} />
     </main>
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { countdownParts, formatDeadline, getDeadline, isExpired } from "@/lib/prazo";
+import { countdownParts, formatDeadline, getDeadline, isExpired, PrazoMode } from "@/lib/prazo";
 
 /* Relógio do prazo de validação. Só começa a contar depois da montagem
    (useEffect) para não gerar hidratação diferente entre servidor e navegador. */
-export function useDeadline() {
-  const [deadline] = useState(() => getDeadline());
+export function useDeadline(mode?: PrazoMode) {
+  const [deadline] = useState(() => getDeadline(mode));
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {

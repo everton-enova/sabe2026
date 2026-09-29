@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default function CpPage() {
-  if (isExpired(getDeadline())) {
-    return <PrazoEncerrado titulo="Validação dos Coordenadores de Polo" />;
+  if (isExpired(getDeadline("cp"))) {
+    return <PrazoEncerrado titulo="Validação dos Coordenadores de Polo" mode="cp" />;
   }
   return <ApplicationForm mode="cp" />;
 }

@@ -81,7 +81,15 @@ As variáveis de planilha são necessárias para gravar os envios em produção.
 
 ## Prazo de validação (contador regressivo)
 
-O formulário (`/aplicacao/cp` e `/aplicacao/sm`) mostra um **contador regressivo** até o prazo definido em `NEXT_PUBLIC_SABE_PRAZO_FIM`. Quando o prazo termina:
+O formulário (`/aplicacao/cp` e `/aplicacao/sm`) mostra um **contador regressivo** até o prazo definido em `NEXT_PUBLIC_SABE_PRAZO_FIM`. Cada formulário pode ter um prazo próprio, que **sobrepõe** o prazo geral:
+
+| Variável | Formulário |
+| --- | --- |
+| `NEXT_PUBLIC_SABE_PRAZO_FIM` | Prazo geral (CP e SM) |
+| `NEXT_PUBLIC_SABE_PRAZO_FIM_CP` | Somente Coordenadores de Polo (CP) |
+| `NEXT_PUBLIC_SABE_PRAZO_FIM_SM` | Somente Supervisor Municipal (SM) |
+
+Quando o prazo termina:
 
 - o formulário é substituído pela mensagem **“Encerrou-se o prazo de validação.”**;
 - a rota `/api/inscricoes` também rejeita novos envios (resposta `410`), como reforço no servidor.
@@ -97,7 +105,7 @@ Valores aceitos:
 
 > O contador e o bloqueio usam o relógio do visitante no navegador; o bloqueio da API e das páginas usa o relógio do servidor. Por isso, defina sempre o prazo com a data/hora de encerramento desejada.
 
-**Para voltar ao ar** depois de encerrado: defina `NEXT_PUBLIC_SABE_PRAZO_FIM` com um prazo futuro (ex.: `2026-10-05T23:59:00-03:00`) e faça **Redeploy** na Vercel (ou reinicie o `next dev` local). Com a variável vazia, o formulário encerra **todo dia às 23:59** e volta a contar para o dia seguinte à meia-noite; para encerrar definitivamente em uma data, defina uma data passada (ex.: `2026-09-29T23:59:00-03:00`).
+**Para voltar ao ar** depois de encerrado: defina a variável do prazo (geral ou do formulário) com um valor futuro (ex.: `2026-10-05T23:59:00-03:00`) e faça **Redeploy** na Vercel (ou reinicie o `next dev` local). Com a variável vazia, o formulário encerra **todo dia às 23:59** e volta a contar para o dia seguinte à meia-noite; para encerrar definitivamente em uma data, defina uma data passada (ex.: `2026-09-29T23:59:00-03:00`).
 
 ## 6. Diagnóstico rápido e erros conhecidos
 

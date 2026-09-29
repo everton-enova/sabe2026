@@ -142,7 +142,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [nteValidated, setNteValidated] = useState<string[]>([]);
   const [perNteFallback, setPerNteFallback] = useState(false);
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
-  const { deadline, now, expired, parts } = useDeadline();
+  const { deadline, now, expired, parts } = useDeadline(mode);
   const prazoEncerrado = Boolean(deadline && expired);
 
   const ntes = useMemo(
@@ -547,7 +547,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       )}
 
       {prazoEncerrado ? (
-        <PrazoEncerradoBox />
+        <PrazoEncerradoBox mode={mode} />
       ) : (
         <>
           {stage !== "success" && (
