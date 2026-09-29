@@ -46,6 +46,13 @@ function normalized(value: string) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+function normalizaSimNao(value: string) {
+  const v = String(value || "").trim();
+  if (/^sim$/i.test(v)) return "Sim";
+  if (/^n[ãa]o$/i.test(v)) return "Não";
+  return value;
+}
+
 // Chave NTE+polo para casar com a lista pre-carregada de polos ja validados.
 const nteKey = (value: string) => String(Number(String(value || "").replace(/\D/g, "")));
 const placeKey = (nte: string, polo: string) => `${nteKey(nte)}|${normalized(polo)}`;
@@ -312,6 +319,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           }
           if (key === "nome" || key === "funcao") {
             return [key, valor.toUpperCase()];
+          }
+          if (key === "experiencia") {
+            return [key, normalizaSimNao(valor)];
           }
           return [key, valor];
         })) as Details
@@ -625,7 +635,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                   <option value="Não">Não</option>
                 </select>
               </label>
-              {details.experiencia === "Sim" && (
+              {normalizaSimNao(details.experiencia) === "Sim" && (
                 <label>Função que já exerceu
                   <input name="funcao" value={details.funcao} onChange={(event) => setDetails({ ...details, funcao: event.target.value.toUpperCase() })} placeholder="Ex: COORDENADOR, APLICADOR" required={action !== "editar"} />
                 </label>
