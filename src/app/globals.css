@@ -226,3 +226,93 @@ option:disabled:hover {
   font-size: 1rem;
   font-weight: 700;
 }
+
+/* Contador regressivo do prazo de validação */
+.prazo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 28px 0 0;
+  padding: 18px 22px;
+  color: var(--text);
+  background: var(--blue-soft);
+  border: 1px solid #cfe4f4;
+  border-left: 4px solid var(--blue);
+  border-radius: 3px;
+}
+.prazo-banner-copy {
+  display: grid;
+  gap: 4px;
+}
+.prazo-label {
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.prazo-end {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.prazo-clock {
+  min-width: 148px;
+  text-align: right;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--blue);
+}
+.prazo-banner.expired {
+  color: #594309;
+  background: #fff8df;
+  border-color: #f0d88a;
+  border-left-color: #d49b09;
+}
+.prazo-banner.expired .prazo-label {
+  color: #8a6200;
+}
+
+.prazo-encerrado-box {
+  padding: 32px 8px;
+  text-align: center;
+}
+.prazo-encerrado-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 24px;
+  color: #fff;
+  background: var(--error);
+  border-radius: 50%;
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+.prazo-encerrado-box .eyebrow {
+  color: var(--error);
+}
+.prazo-encerrado-box h2 {
+  margin-top: 8px;
+  font-size: clamp(1.9rem, 5vw, 3rem);
+  letter-spacing: -.04em;
+}
+.prazo-encerrado-box p:not(.eyebrow) {
+  max-width: 560px;
+  margin: 14px auto 0;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .prazo-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .prazo-clock {
+    min-width: 0;
+    text-align: left;
+  }
+}

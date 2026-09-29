@@ -5,6 +5,9 @@ import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
 import { BotCheck } from "@/components/bot-check";
 import { Coordinator, Details, detailLabels, emptyDetails } from "@/lib/cp";
+import { PrazoEncerradoBox } from "@/components/prazo-encerrado";
+import { useDeadline } from "@/components/prazo-countdown";
+import { formatDeadline } from "@/lib/prazo";
 
 type Mode = "cp" | "sm";
 type Stage = "selection" | "candidate" | "conference" | "form" | "replace-document" | "review" | "success";
@@ -139,6 +142,8 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [nteValidated, setNteValidated] = useState<string[]>([]);
   const [perNteFallback, setPerNteFallback] = useState(false);
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
+  const { deadline, now, expired, parts } = useDeadline();
+  const prazoEncerrado = Boolean(deadline && expired);
 
   const ntes = useMemo(
     () => unique((isCp ? data.coordinators : data.locations).map((item) => item.nte)),
@@ -500,7 +505,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <li>Selecione o município.</li>
                 <li>Confira os dados apresentados dos Coordenadores de Polo que atuaram no SABE 2025 e verifique se permanecem para o SABE 2026.</li>
                 <li>Caso as informações estejam corretas, realize a validação.</li>
-                <li>Caso seja necessária a substituição do Coordenador de Polo, selecione a opção "Alterar Coordenador de Polo" e informe os dados da nova pessoa indicada.</li>
+                <li>Caso seja necessária a substituição do Coordenador de Polo, selecione a opção &quot;Alterar Coordenador de Polo&quot; e informe os dados da nova pessoa indicada.</li>
               </ol>
               <p><strong>Confira todas as informações antes de concluir o formulário.</strong></p>
             </>
@@ -529,8 +534,24 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         )}
       </section>
 
-      {stage !== "success" && (
-        <ol className="steps" aria-label="Etapas do formulário">
+      {deadline && !prazoEncerrado && (
+        <div className="prazo-banner" role="timer">
+          <div className="prazo-banner-copy">
+            <span className="prazo-label">Prazo de validação encerra em</span>
+            <span className="prazo-end">{now === null ? "—" : formatDeadline(deadline)}</span>
+          </div>
+          <div className="prazo-clock" aria-hidden="true">
+            {now === null ? "--:--:--" : parts ? `${parts.days > 0 ? `${parts.days}d ` : ""}${parts.hours}:${parts.minutes}:${parts.seconds}` : "00:00:00"}
+          </div>
+        </div>
+      )}
+
+      {prazoEncerrado ? (
+        <PrazoEncerradoBox />
+      ) : (
+        <>
+          {stage !== "success" && (
+            <ol className="steps" aria-label="Etapas do formulário">
           {["Localização", isCp ? "Validação" : "Dados", "Revisão"].map((label, index) => (
             <li className={stageNumber >= index + 1 ? "active" : ""} key={label} aria-current={stageNumber === index + 1 ? "step" : undefined}>
               <span>{index + 1}</span> {label}
@@ -832,7 +853,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         {stage === "success" && (
           <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido e processado com sucesso.</p><div className="form-actions"><button type="button" className="button primary" onClick={resetSelection}>Fazer novo cadastro <span>→</span></button></div></div>
         )}
-      </section>
+          </section>
+        </>
+      )}
 
       {submitting && (
         <div className="loading-overlay" role="status" aria-live="polite">

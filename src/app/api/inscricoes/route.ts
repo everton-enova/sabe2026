@@ -2,6 +2,7 @@ import { ApiError, failure, json, readRequest } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { bucketEnabled, replaceDocumento, uploadDocumento } from "@/lib/supabase";
+import { getDeadline, isExpired } from "@/lib/prazo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +71,7 @@ function validCpf(value: unknown) {
 
 export async function POST(request: Request) {
   try {
+    if (isExpired(getDeadline())) throw new ApiError(410, "Encerrou-se o prazo de validação.");
     const { payload, arquivo } = await readPayload(request);
     // Le o anexo (multipart) ou aceita base64 ja codificado no JSON (integracoes e testes).
     let arquivoNome = "";

@@ -36,6 +36,7 @@ No projeto **sabe2026**, acesse **Settings → Environment Variables** e cadastr
 | `SABE_DIAGNOSTICO_SECRET` | (Opcional) Segredo para acessar `/api/diagnostico?chave=...`. Sem ele o endpoint fica fechado |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | (Opcional) Sitekey do Cloudflare Turnstile |
 | `TURNSTILE_SECRET_KEY` | (Opcional) Secret do Cloudflare Turnstile (mesmo par do sitekey) |
+| `NEXT_PUBLIC_SABE_PRAZO_FIM` | (Opcional) Prazo de validação do formulário. Vazio = sem prazo; `HOJE_2359` = hoje às 23:59 (horário da Bahia); ou data ISO com fuso (`2026-09-29T23:59:00-03:00`) |
 
 Marque os ambientes **Production**, **Preview** e **Development**. Depois abra **Deployments**, localize o último deploy e use **Redeploy** para que as variáveis entrem em vigor.
 > Sempre que `google-apps-script/Code.gs` mudar, edite a implantação existente em **Implantar → Gerenciar implantações → Editar → Versão: Nova versão**. Não crie uma "Nova implantação" (isso troca a URL e a Vercel fica apontando para o código antigo).
@@ -77,6 +78,26 @@ No editor do Apps Script, escolha no topo a função **`removerAbasSaida`** e cl
 - Verificação anti-bot fica desativada enquanto `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` não estiverem configuradas.
 
 As variáveis de planilha são necessárias para gravar os envios em produção.
+
+## Prazo de validação (contador regressivo)
+
+O formulário (`/aplicacao/cp` e `/aplicacao/sm`) mostra um **contador regressivo** até o prazo definido em `NEXT_PUBLIC_SABE_PRAZO_FIM`. Quando o prazo termina:
+
+- o formulário é substituído pela mensagem **“Encerrou-se o prazo de validação.”**;
+- a rota `/api/inscricoes` também rejeita novos envios (resposta `410`), como reforço no servidor.
+
+Valores aceitos:
+
+| Valor | Efeito |
+| --- | --- |
+| vazio | Sem prazo: o formulário fica sempre aberto (sem contador) |
+| `HOJE_2359` | Encerra **hoje às 23:59** no horário da Bahia (UTC-3) |
+| `2026-09-29T23:59:00-03:00` | Encerra na data/hora exata informada |
+| `2026-09-29T23:59` | Data/hora sem fuso: interpretada como horário da Bahia (-03:00) |
+
+> O contador e o bloqueio usam o relógio do visitante no navegador; o bloqueio da API e das páginas usa o relógio do servidor. Por isso, defina sempre o prazo com a data/hora de encerramento desejada.
+
+**Para voltar ao ar** depois de encerrado: troque `NEXT_PUBLIC_SABE_PRAZO_FIM` por um prazo futuro (ex.: `2026-10-05T23:59:00-03:00`) ou por `HOJE_2359` e faça **Redeploy** na Vercel (ou reinicie o `next dev` local). Depois que o prazo passa, ele **não** reabre sozinho — a reabertura é sempre manual.
 
 ## 6. Diagnóstico rápido e erros conhecidos
 
