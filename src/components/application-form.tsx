@@ -270,7 +270,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
   const bancoNormalizado = normalized(details.banco);
   const caixaSelecionada = /(^|\D)104(\D|$)/.test(bancoNormalizado) || bancoNormalizado.includes("CAIXA ECONOMICA");
-  const exibirOperacao = isCp ? caixaSelecionada : details.tipoConta === "Poupança";
+  const exibirOperacao = caixaSelecionada;
 
   const placeLabel = isCp ? "Polo" : "Município";
   const stageNumber = stage === "selection" ? 1 : stage === "candidate" || stage === "conference" || stage === "form" || stage === "replace-document" ? 2 : 3;
