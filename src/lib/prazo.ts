@@ -1,8 +1,8 @@
 /* Prazo de validação do formulário SABE 2026.
 
-   Para o CP, a ausência de uma data fixa encerra definitivamente em
-   29/09/2026 às 23:59:59 (horário da Bahia). Isso evita que o prazo avance
-   automaticamente para o dia seguinte.
+   O CP foi reaberto excepcionalmente até 30/09/2026 às 12:00
+   (horário da Bahia). O prazo fica fixado no código para que configurações
+   antigas da hospedagem não impeçam a reabertura nem estendam o horário.
 
    Para os demais casos, sem a variável, o prazo é HOJE às 23:59 (Bahia).
    Para definir um prazo exato — ou reabrir por um período — use:
@@ -19,7 +19,7 @@
 
 // Bahia = America/Bahia, UTC-3, sem horário de verão.
 const BAHIA_OFFSET_MS = -3 * 60 * 60 * 1000;
-const CP_DEADLINE_PADRAO = "2026-09-29T23:59:59.999-03:00";
+const CP_DEADLINE_VIGENTE = "2026-09-30T12:00:00.000-03:00";
 
 function hojeAs2359(): Date {
   const bahiaAgora = new Date(Date.now() + BAHIA_OFFSET_MS);
@@ -49,11 +49,6 @@ function parseValue(value: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function isPrazoDiario(value: string): boolean {
-  const normalized = value.trim().replace(/[\s:_-]/g, "");
-  return !normalized || /^hoje2359$/i.test(normalized);
-}
-
 export function resolveDeadline(raw: string | undefined): Date | null {
   return parseValue(String(raw || ""));
 }
@@ -65,17 +60,10 @@ export type PrazoMode = "cp" | "sm";
 export function getDeadline(mode?: PrazoMode): Date {
   const rawGeneral = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM || "").trim();
 
-  // O CP terminou em uma data definitiva. Uma configuração vazia ou dinâmica
-  // (HOJE_2359) não pode reabrir o formulário a cada virada de dia.
+  // Reabertura excepcional do CP. Durante esta janela, a data fixa prevalece
+  // sobre variáveis antigas configuradas na hospedagem.
   if (mode === "cp") {
-    const rawCp = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM_CP || "").trim();
-    const specific = parseValue(rawCp);
-    if (specific && !isPrazoDiario(rawCp)) return specific;
-
-    const general = parseValue(rawGeneral);
-    if (general && !isPrazoDiario(rawGeneral)) return general;
-
-    return new Date(CP_DEADLINE_PADRAO);
+    return new Date(CP_DEADLINE_VIGENTE);
   }
 
   // Prazo específico do formulário tem prioridade sobre o prazo geral.
