@@ -86,7 +86,7 @@ O formulário (`/aplicacao/cp` e `/aplicacao/sm`) mostra um **contador regressiv
 | Variável | Formulário |
 | --- | --- |
 | `NEXT_PUBLIC_SABE_PRAZO_FIM` | Prazo geral (CP e SM) |
-| `NEXT_PUBLIC_SABE_PRAZO_FIM_CP` | Somente Coordenadores de Polo (CP) |
+| `NEXT_PUBLIC_SABE_PRAZO_FIM_CP` | Somente Coordenadores de Polo (CP). Na ausência de uma data fixa, o sistema usa definitivamente `2026-09-29T23:59:59.999-03:00` |
 | `NEXT_PUBLIC_SABE_PRAZO_FIM_SM` | Somente Supervisor Municipal (SM) |
 
 Quando o prazo termina:
@@ -105,7 +105,7 @@ Valores aceitos:
 
 > O contador e o bloqueio usam o relógio do visitante no navegador; o bloqueio da API e das páginas usa o relógio do servidor. Por isso, defina sempre o prazo com a data/hora de encerramento desejada.
 
-**Para voltar ao ar** depois de encerrado: defina a variável do prazo (geral ou do formulário) com um valor futuro (ex.: `2026-10-05T23:59:00-03:00`) e faça **Redeploy** na Vercel (ou reinicie o `next dev` local). Com a variável vazia, o formulário encerra **todo dia às 23:59** e volta a contar para o dia seguinte à meia-noite; para encerrar definitivamente em uma data, defina uma data passada (ex.: `2026-09-29T23:59:00-03:00`).
+**Para voltar ao ar** depois de encerrado: defina a variável do prazo (geral ou do formulário) com um valor futuro (ex.: `2026-10-05T23:59:00-03:00`) e faça **Redeploy** na Vercel (ou reinicie o `next dev` local). Para o CP, uma variável vazia ou `HOJE_2359` não reabre o formulário: o sistema usa o encerramento definitivo de **29/09/2026 às 23:59:59**. Nos demais casos, uma variável vazia ainda encerra todo dia às 23:59 e volta a contar para o dia seguinte à meia-noite.
 
 ## 6. Diagnóstico rápido e erros conhecidos
 

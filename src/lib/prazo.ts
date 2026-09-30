@@ -1,6 +1,10 @@
 /* Prazo de validação do formulário SABE 2026.
 
-   Por padrão (sem a variável), o prazo é HOJE às 23:59 (horário da Bahia).
+   Para o CP, a ausência de uma data fixa encerra definitivamente em
+   29/09/2026 às 23:59:59 (horário da Bahia). Isso evita que o prazo avance
+   automaticamente para o dia seguinte.
+
+   Para os demais casos, sem a variável, o prazo é HOJE às 23:59 (Bahia).
    Para definir um prazo exato — ou reabrir por um período — use:
    - NEXT_PUBLIC_SABE_PRAZO_FIM=HOJE_2359                -> hoje às 23:59 (Bahia).
    - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59:00-03:00 -> data/hora exata.
@@ -15,6 +19,7 @@
 
 // Bahia = America/Bahia, UTC-3, sem horário de verão.
 const BAHIA_OFFSET_MS = -3 * 60 * 60 * 1000;
+const CP_DEADLINE_PADRAO = "2026-09-29T23:59:59.999-03:00";
 
 function hojeAs2359(): Date {
   const bahiaAgora = new Date(Date.now() + BAHIA_OFFSET_MS);
@@ -44,6 +49,11 @@ function parseValue(value: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function isPrazoDiario(value: string): boolean {
+  const normalized = value.trim().replace(/[\s:_-]/g, "");
+  return !normalized || /^hoje2359$/i.test(normalized);
+}
+
 export function resolveDeadline(raw: string | undefined): Date | null {
   return parseValue(String(raw || ""));
 }
@@ -53,6 +63,21 @@ export function resolveDeadline(raw: string | undefined): Date | null {
 export type PrazoMode = "cp" | "sm";
 
 export function getDeadline(mode?: PrazoMode): Date {
+  const rawGeneral = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM || "").trim();
+
+  // O CP terminou em uma data definitiva. Uma configuração vazia ou dinâmica
+  // (HOJE_2359) não pode reabrir o formulário a cada virada de dia.
+  if (mode === "cp") {
+    const rawCp = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM_CP || "").trim();
+    const specific = parseValue(rawCp);
+    if (specific && !isPrazoDiario(rawCp)) return specific;
+
+    const general = parseValue(rawGeneral);
+    if (general && !isPrazoDiario(rawGeneral)) return general;
+
+    return new Date(CP_DEADLINE_PADRAO);
+  }
+
   // Prazo específico do formulário tem prioridade sobre o prazo geral.
   if (mode) {
     const rawMode = String(
@@ -61,9 +86,8 @@ export function getDeadline(mode?: PrazoMode): Date {
     const specific = parseValue(rawMode);
     if (specific) return specific;
   }
-  const raw = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM || "").trim();
   // Sem variável (ou valor inválido), o padrão é hoje às 23:59 na Bahia.
-  return resolveDeadline(raw) ?? hojeAs2359();
+  return resolveDeadline(rawGeneral) ?? hojeAs2359();
 }
 
 export function isExpired(deadline: Date | null, now: number = Date.now()): boolean {
