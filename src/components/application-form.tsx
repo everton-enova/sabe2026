@@ -141,6 +141,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [substituirPlaces, setSubstituirPlaces] = useState<string[]>([]);
   const [nteValidated, setNteValidated] = useState<string[]>([]);
   const [perNteFallback, setPerNteFallback] = useState(false);
+  const [loadingNteValidated, setLoadingNteValidated] = useState(false);
+  const [validationStatusFailed, setValidationStatusFailed] = useState(false);
+  const [validationRetry, setValidationRetry] = useState(0);
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
   const { deadline, now, expired, parts } = useDeadline(mode);
   const prazoEncerrado = Boolean(deadline && expired);
@@ -206,6 +209,9 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
     const controller = new AbortController();
     let ativo = true;
     async function loadForNte() {
+      setLoadingNteValidated(true);
+      setValidationStatusFailed(false);
+      setNteValidated([]);
       try {
         const response = await fetch(`/api/validacao-status?nte=${encodeURIComponent(nte)}&mode=${mode}`, {
           cache: "no-store",
@@ -213,6 +219,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         });
         const result = await safeJson(response);
         if (!ativo) return;
+        if (!response.ok || result.falha === true) throw new Error("Não foi possível confirmar os polos já validados.");
         const items = Array.isArray(result.validated) ? result.validated : [];
         setNteValidated(items
           .map((item) => {
@@ -225,12 +232,17 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           })
           .filter(Boolean));
       } catch {
-        if (ativo) setNteValidated([]);
+        if (ativo) {
+          setNteValidated([]);
+          setValidationStatusFailed(true);
+        }
+      } finally {
+        if (ativo) setLoadingNteValidated(false);
       }
     }
     loadForNte();
     return () => { ativo = false; controller.abort(); };
-  }, [isCp, perNteFallback, nte, mode]);
+  }, [isCp, perNteFallback, nte, mode, validationRetry]);
 
   const places = useMemo(() => {
     if (!nte) return [];
@@ -256,13 +268,22 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       .slice(0, 12);
   }, [bankChoice, bankSearch, details.tipoConta]);
 
+  const bancoNormalizado = normalized(details.banco);
+  const caixaSelecionada = /(^|\D)104(\D|$)/.test(bancoNormalizado) || bancoNormalizado.includes("CAIXA ECONOMICA");
+  const exibirOperacao = isCp ? caixaSelecionada : details.tipoConta === "Poupança";
+
   const placeLabel = isCp ? "Polo" : "Município";
   const stageNumber = stage === "selection" ? 1 : stage === "candidate" || stage === "conference" || stage === "form" || stage === "replace-document" ? 2 : 3;
+  const loadingPlaceStatus = loadingValidated || loadingNteValidated;
 
   async function selectLocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
     if (!nte || !place || busy.current) return;
+    if (loadingPlaceStatus || validationStatusFailed) {
+      setMessage("Aguarde a confirmação dos polos já validados antes de continuar.");
+      return;
+    }
 
     // Municípios com ofício inválido liberados para trocar apenas o documento.
     if (!isCp && substituirPlaces.includes(placeKey(nte, place))) {
@@ -295,9 +316,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
         if (!response.ok || result.ok === false || (!result.nome && !result.registro)) {
           const base = result.message || result.error || "Não foi possível localizar a indicação.";
-          // Mostra também a causa da API (detalhe) para a mensagem não ficar opaca.
-          const causa = typeof result.detalhe === "string" ? ` ${result.detalhe}` : "";
-          throw new Error(`${base}${causa}`);
+          // Na tela pública, falhas de infraestrutura recebem uma orientação curta.
+          throw new Error(response.status >= 500
+            ? "Não foi possível consultar o polo agora. Aguarde alguns segundos e tente novamente."
+            : base);
         }
 
         setCoordinator(result as unknown as Coordinator);
@@ -453,8 +475,10 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
       }
       const result = await safeJson(response);
       if (!response.ok || result.ok === false) {
-        const detail = result.detalhe ? ` (${result.detalhe})` : "";
-        throw new Error((result.message || result.error || "Não foi possível concluir o envio.") + detail);
+        const base = result.message || result.error || "Não foi possível concluir o envio.";
+        throw new Error(response.status >= 500
+          ? "Não foi possível concluir o envio agora. Aguarde alguns segundos e tente novamente."
+          : base);
       }
       setStage("success");
       // O polo/município recém-validado já entra na lista, para aparecer marcado se voltar.
@@ -562,14 +586,25 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
 
       <section className="form-shell" aria-live="polite">
         {stage === "selection" && (
-          <form onSubmit={selectLocation} aria-busy={loadingCandidate || loadingValidated}>
+          <form onSubmit={selectLocation} aria-busy={loadingCandidate || loadingPlaceStatus}>
             <div className="section-heading"><span>01</span><div><h2>Identifique o local</h2><p>As opções seguem a relação oficial da planilha SABE 2026.</p></div></div>
             {loadingValidated && (
               <p className="loading-line" role="status"><span className="spinner" aria-hidden="true" />Carregando os dados dos polos…</p>
             )}
+            {loadingNteValidated && (
+              <p className="loading-line" role="status"><span className="spinner" aria-hidden="true" />Confirmando os polos já validados deste NTE…</p>
+            )}
             <div className="field-grid">
               <label>NTE
-                <select disabled={loadingCandidate || loadingValidated} value={nte} onChange={(event) => { setNte(event.target.value); setPlace(""); setMessage(""); }} required>
+                <select disabled={loadingCandidate || loadingValidated} value={nte} onChange={(event) => {
+                  const selectedNte = event.target.value;
+                  setNte(selectedNte);
+                  setPlace("");
+                  setNteValidated([]);
+                  setValidationStatusFailed(false);
+                  setLoadingNteValidated(Boolean(isCp && perNteFallback && selectedNte));
+                  setMessage("");
+                }} required>
                   <option value="">Selecione o NTE</option>
                   {ntes.map((item) => <option key={item}>{item}</option>)}
                 </select>
@@ -578,7 +613,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                 <select
                   value={place}
                   onChange={(event) => { setPlace(event.target.value); setMessage(""); }}
-                  disabled={!nte || loadingCandidate || loadingValidated}
+                  disabled={!nte || loadingCandidate || loadingPlaceStatus || validationStatusFailed}
                   required
                 >
                   <option value="">Selecione {isCp ? "o polo" : "o município"}</option>
@@ -593,9 +628,15 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
             {places.length > 0 && places.every((item) => item.isDisabled) && (
               <p className="form-message error" role="status">{isCp ? "Todos os polos deste NTE já foram validados." : "Todos os municípios deste NTE já foram cadastrados."}</p>
             )}
+            {validationStatusFailed && (
+              <p className="form-message error" role="alert">
+                Não foi possível confirmar agora quais polos já foram validados. Para evitar uma seleção incorreta, a lista foi bloqueada.{' '}
+                <button className="bank-other" type="button" onClick={() => setValidationRetry((value) => value + 1)}>Tentar novamente</button>
+              </p>
+            )}
             {loadingCandidate && <p role="status">Consultando a indicação do polo…</p>}
             {message && <p className="form-message error" role="alert">{message}</p>}
-            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate || loadingValidated}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
+            <div className="form-actions"><button className="button primary" type="submit" disabled={!nte || !place || loadingCandidate || loadingPlaceStatus || validationStatusFailed}>{loadingCandidate ? "Consultando..." : isCp ? "Consultar" : "Continuar"}{!loadingCandidate && <span>→</span>}</button></div>
           </form>
         )}
 
@@ -667,7 +708,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
               <p className="field-help">
                 A conta bancária deve estar em nome do titular indicado acima.
                 Para contas poupança, será aceita exclusivamente a Caixa Econômica Federal.
-                Nesse caso, confira atentamente os dados da operação.
+                Sempre que o banco for a Caixa, confira atentamente os dados da variação/operação.
               </p>
               <div className="field-grid">
                 <label>Tipo de Conta
@@ -762,7 +803,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
                   <input name="contaDigito" value={details.contaDigito || ""} onChange={(event) => setDetails({ ...details, contaDigito: event.target.value })} placeholder="Ex: 7" maxLength={2} />
                 </label>
 
-                {details.tipoConta === "Poupança" && (
+                {exibirOperacao && (
                   <label>Variação/Operação
                     <input name="operacao" value={details.operacao || ""} onChange={(event) => setDetails({ ...details, operacao: event.target.value })} required={action !== "editar"} placeholder="Ex: 0001, 01, etc." />
                   </label>

@@ -92,6 +92,10 @@ export async function sheets(payload: Record<string, unknown>) {
      então usamos 35s com uma segunda tentativa de 25s: quase sempre a 1a esquentou
      o script e a 2a passa. Antes o timeout era 15s e estourava no meio do cold start. */
   const withTimeout = (ms: number) => AbortSignal.timeout(ms);
+  // Reenvios de cadastro podem duplicar uma gravação concluída cujo retorno falhou.
+  // Para gravações, só repetimos 404: o endpoint não recebeu a operação.
+  const isRead = ["indicacao", "validados", "status"].includes(String(payload.tipo || ""));
+  const retryableStatuses = new Set(isRead ? [404, 408, 429, 500, 502, 503, 504] : [404]);
   let response: Response | null = null;
   let lastError: unknown = null;
   for (let tentativa = 0; tentativa < 2 && !response; tentativa += 1) {
@@ -103,10 +107,19 @@ export async function sheets(payload: Record<string, unknown>) {
           (typeof payload.arquivoBase64 === "string" && payload.arquivoBase64) ? 55000 : 35000
         ),
       });
+      // O Apps Script pode responder transitoriamente com 404 enquanto uma instância
+      // ou implantação é resolvida. Repetimos uma vez antes de tratar como URL removida.
+      if (!response.ok && tentativa === 0 && retryableStatuses.has(response.status)) {
+        response = null;
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
     } catch (error) {
       lastError = error;
       if (payload.tipo === "indicacao" && typeof payload.nte === "string" && typeof payload.polo === "string") return publicIndication(payload.nte, payload.polo);
-      if (tentativa === 0) continue; // segunda chance: script ja esquentou
+      if (tentativa === 0) {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        continue; // segunda chance: script ja esquentou
+      }
       throw new ApiError(502, "Não foi possível acessar a planilha.", `a requisição ao Apps Script falhou (${nomeDoErro(error)}): confira se SABE_SHEETS_WEBHOOK_URL termina em /exec`);
     }
   }
