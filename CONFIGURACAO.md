@@ -86,7 +86,7 @@ O formulário (`/aplicacao/cp` e `/aplicacao/sm`) mostra um **contador regressiv
 | Variável | Formulário |
 | --- | --- |
 | `NEXT_PUBLIC_SABE_PRAZO_FIM` | Prazo geral (CP e SM) |
-| `NEXT_PUBLIC_SABE_PRAZO_FIM_CP` | Somente Coordenadores de Polo (CP). Reaberto excepcionalmente até `2026-09-30T23:59:00.000-03:00`; durante essa janela, o prazo fixado no código prevalece sobre configurações antigas |
+| `NEXT_PUBLIC_SABE_PRAZO_FIM_CP` | Somente Coordenadores de Polo (CP). Reaberto excepcionalmente até `2026-10-02T23:59:00.000-03:00`; durante essa janela, o prazo fixado no código prevalece sobre configurações antigas |
 | `NEXT_PUBLIC_SABE_PRAZO_FIM_SM` | Somente Supervisor Municipal (SM) |
 
 Quando o prazo termina:

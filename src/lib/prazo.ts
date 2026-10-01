@@ -1,6 +1,6 @@
 /* Prazo de validação do formulário SABE 2026.
 
-   O CP foi reaberto excepcionalmente até 30/09/2026 às 23:59
+   O CP foi reaberto excepcionalmente até 02/10/2026 às 23:59
    (horário da Bahia). O prazo fica fixado no código para que configurações
    antigas da hospedagem não impeçam a reabertura nem estendam o horário.
 
@@ -19,7 +19,7 @@
 
 // Bahia = America/Bahia, UTC-3, sem horário de verão.
 const BAHIA_OFFSET_MS = -3 * 60 * 60 * 1000;
-const CP_DEADLINE_VIGENTE = "2026-09-30T23:59:00.000-03:00";
+const CP_DEADLINE_VIGENTE = "2026-10-02T23:59:00.000-03:00";
 
 function hojeAs2359(): Date {
   const bahiaAgora = new Date(Date.now() + BAHIA_OFFSET_MS);
