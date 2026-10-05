@@ -5,9 +5,7 @@ import banks from "@/data/banks.json";
 import data from "@/data/sabe.json";
 import { BotCheck } from "@/components/bot-check";
 import { Coordinator, Details, detailLabels, emptyDetails } from "@/lib/cp";
-import { PrazoEncerradoBox } from "@/components/prazo-encerrado";
-import { useDeadline } from "@/components/prazo-countdown";
-import { formatDeadline } from "@/lib/prazo";
+
 
 type Mode = "cp" | "sm";
 type Stage = "selection" | "candidate" | "conference" | "form" | "replace-document" | "review" | "success";
@@ -145,8 +143,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
   const [validationStatusFailed, setValidationStatusFailed] = useState(false);
   const [validationRetry, setValidationRetry] = useState(0);
   const [coordinator, setCoordinator] = useState<Coordinator | undefined>();
-  const { deadline, now, expired, parts } = useDeadline(mode);
-  const prazoEncerrado = Boolean(deadline && expired);
+
 
   const ntes = useMemo(
     () => unique((isCp ? data.coordinators : data.locations).map((item) => item.nte)),
@@ -558,23 +555,7 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
         )}
       </section>
 
-      {deadline && !prazoEncerrado && (
-        <div className="prazo-banner" role="timer">
-          <div className="prazo-banner-copy">
-            <span className="prazo-label">Prazo de validação encerra em</span>
-            <span className="prazo-end">{now === null ? "—" : formatDeadline(deadline)}</span>
-          </div>
-          <div className="prazo-clock" aria-hidden="true">
-            {now === null ? "--:--:--" : parts ? `${parts.days > 0 ? `${parts.days}d ` : ""}${parts.hours}:${parts.minutes}:${parts.seconds}` : "00:00:00"}
-          </div>
-        </div>
-      )}
-
-      {prazoEncerrado ? (
-        <PrazoEncerradoBox mode={mode} />
-      ) : (
-        <>
-          {stage !== "success" && (
+      {stage !== "success" && (
             <ol className="steps" aria-label="Etapas do formulário">
           {["Localização", isCp ? "Validação" : "Dados", "Revisão"].map((label, index) => (
             <li className={stageNumber >= index + 1 ? "active" : ""} key={label} aria-current={stageNumber === index + 1 ? "step" : undefined}>
@@ -895,8 +876,6 @@ export function ApplicationForm({ mode }: { mode: Mode }) {
           <div className="success-state"><span className="success-icon">✓</span><p className="eyebrow">Envio concluído</p><h2>Dados confirmados</h2><p>O registro de {place} foi recebido e processado com sucesso.</p><div className="form-actions"><button type="button" className="button primary" onClick={resetSelection}>Fazer novo cadastro <span>→</span></button></div></div>
         )}
           </section>
-        </>
-      )}
 
       {submitting && (
         <div className="loading-overlay" role="status" aria-live="polite">
