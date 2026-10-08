@@ -45,3 +45,49 @@ using (bucket_id = 'sabe2026-documentos');
 select id, name, public, file_size_limit, allowed_mime_types
 from storage.buckets
 where id = 'sabe2026-documentos';
+
+-- ============================================================
+-- Tabela de backup das submissões (evita perda de dados)
+-- Armazena todos os dados enviados pelo formulário antes de
+-- enviar para o Google Sheets. Se a gravação na planilha
+-- falhar, os dados ficam preservados aqui.
+-- ============================================================
+
+create table if not exists sabe2026_submissoes (
+  id uuid primary key default gen_random_uuid(),
+  enviado_em timestamptz not null default now(),
+  modalidade text not null check (modalidade in ('CP', 'SM')),
+  acao text not null,
+  nte text not null,
+  local text not null,
+  nome text,
+  email text,
+  telefone text,
+  cpf text,
+  banco text,
+  agencia text,
+  agencia_digito text,
+  conta text,
+  conta_digito text,
+  pix text,
+  tipo_conta text,
+  operacao text,
+  experiencia text,
+  funcao text,
+  documento_url text,
+  gravado_na_planilha boolean not null default false,
+  erro_gravacao text,
+  payload_completo jsonb not null
+);
+
+-- Índice para consultas por NTE e local
+create index if not exists idx_sabe2026_submissoes_nte_local on sabe2026_submissoes(nte, local);
+create index if not exists idx_sabe2026_submissoes_enviado_em on sabe2026_submissoes(enviado_em desc);
+
+-- Policy de leitura para o serviço (service role)
+drop policy if exists "sabe2026_submissoes service role" on sabe2026_submissoes;
+create policy "sabe2026_submissoes service role"
+on sabe2026_submissoes for all
+to service_role
+using (true)
+with check (true);

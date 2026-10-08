@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { ApplicationForm } from "@/components/application-form";
+import { PrazoEncerrado } from "@/components/prazo-encerrado";
+import { getDeadline, isExpired } from "@/lib/prazo";
 
 export const dynamic = "force-dynamic";
 
@@ -9,5 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default function CpPage() {
+  if (isExpired(getDeadline("cp"))) {
+    return <PrazoEncerrado titulo="Validação dos Coordenadores de Polo" mode="cp" />;
+  }
   return <ApplicationForm mode="cp" />;
 }

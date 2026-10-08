@@ -40,3 +40,31 @@ O arquivo `google-apps-script/Code.gs` contém o endpoint esperado. No Apps Scri
 Em produção, configure apenas as variáveis da planilha descritas em `CONFIGURACAO.md`.
 
 Consulte `CONFIGURACAO.md` para o passo a passo completo da planilha e da Vercel.
+
+## Backup de Dados (Supabase)
+
+Para evitar perda de dados, o sistema armazena automaticamente uma cópia de todas as submissões no Supabase antes de enviar para o Google Sheets. Se a gravação na planilha falhar, os dados ficam preservados no banco.
+
+### Configuração
+
+1. Execute o script `supabase-setup.sql` no SQL Editor do Supabase para criar a tabela `sabe2026_submissoes`
+2. Configure as variáveis de ambiente:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY` ou `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+### Recuperar Dados Perdidos
+
+Acesse `/admin/submissoes` para visualizar todas as submissões e filtrar as que não foram gravadas na planilha. Você pode marcar manualmente como gravadas após corrigir o problema.
+
+### Script de Recuperação
+
+```bash
+# Lista todas as submissões não gravadas
+node scripts/recuperar-dados.js
+
+# Filtra por NTE e local
+node scripts/recuperar-dados.js --nte 1 --local "Nome do Polo"
+
+# Exporta para JSON
+node scripts/recuperar-dados.js --exportar
+```

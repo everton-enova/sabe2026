@@ -10,7 +10,11 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.png", shortcut: "/favicon.png", apple: "/favicon.png" },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+type LayoutProps = {
+  children: React.ReactNode;
+};
+
+export default function RootLayout({ children }: LayoutProps) {
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body>

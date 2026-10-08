@@ -11,6 +11,69 @@ export function bucketEnabled() {
   return !!supabase;
 }
 
+/* Salva uma submissão no Supabase para backup. Retorna o ID do registro. */
+export async function saveSubmissao(dados: {
+  modalidade: string;
+  acao: string;
+  nte: string;
+  local: string;
+  payload: Record<string, unknown>;
+}) {
+  if (!supabase) return null;
+  
+  const { data, error } = await supabase
+    .from('sabe2026_submissoes')
+    .insert({
+      modalidade: dados.modalidade,
+      acao: dados.acao,
+      nte: dados.nte,
+      local: dados.local,
+      payload_completo: dados.payload,
+      // Extrai campos principais para facilitar consultas
+      nome: typeof dados.payload.nome === 'string' ? dados.payload.nome : null,
+      email: typeof dados.payload.email === 'string' ? dados.payload.email : null,
+      telefone: typeof dados.payload.telefone === 'string' ? dados.payload.telefone : null,
+      cpf: typeof dados.payload.cpf === 'string' ? dados.payload.cpf : null,
+      banco: typeof dados.payload.banco === 'string' ? dados.payload.banco : null,
+      agencia: typeof dados.payload.agencia === 'string' ? dados.payload.agencia : null,
+      agencia_digito: typeof dados.payload.agenciaDigito === 'string' ? dados.payload.agenciaDigito : null,
+      conta: typeof dados.payload.conta === 'string' ? dados.payload.conta : null,
+      conta_digito: typeof dados.payload.contaDigito === 'string' ? dados.payload.contaDigito : null,
+      pix: typeof dados.payload.pix === 'string' ? dados.payload.pix : null,
+      tipo_conta: typeof dados.payload.tipoConta === 'string' ? dados.payload.tipoConta : null,
+      operacao: typeof dados.payload.operacao === 'string' ? dados.payload.operacao : null,
+      experiencia: typeof dados.payload.experiencia === 'string' ? dados.payload.experiencia : null,
+      funcao: typeof dados.payload.funcao === 'string' ? dados.payload.funcao : null,
+      documento_url: typeof dados.payload.documentoUrl === 'string' ? dados.payload.documentoUrl : null,
+    })
+    .select('id')
+    .single();
+  
+  if (error) {
+    console.error('Erro ao salvar submissão no Supabase:', error.message);
+    return null;
+  }
+  
+  return data?.id || null;
+}
+
+/* Marca uma submissão como gravada na planilha. */
+export async function markSubmissaoGravada(id: string, sucesso: boolean, erro?: string) {
+  if (!supabase || !id) return;
+  
+  const { error } = await supabase
+    .from('sabe2026_submissoes')
+    .update({
+      gravado_na_planilha: sucesso,
+      erro_gravacao: erro || null,
+    })
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Erro ao atualizar submissão no Supabase:', error.message);
+  }
+}
+
 /* Faz upload do PDF para o Supabase Storage e retorna a URL pública.
    O caminho inclui NTE, município e timestamp para evitar colisão. */
 export async function uploadDocumento(

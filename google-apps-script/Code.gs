@@ -27,7 +27,7 @@ const CP_FIELDS = {
   atualizado: ["ATUALIZADO"],
   validado: ["VALIDADO/ALTERADO FORM", "VALIDADO", "VALIDADO/ALTERADO"],
 };
-const CP_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "experiencia", "funcao", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao"];
+const CP_DATA_FIELDS = ["nome", "telefone", "email", "cpf", "experiencia", "funcao", "tipoConta", "banco", "agencia", "agenciaDigito", "conta", "contaDigito", "operacao", "pix"];
 const SM_SHEET = "SM-SABE";
 const SM_FIELDS = {
   nte: ["NTE"],

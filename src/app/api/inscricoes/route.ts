@@ -1,7 +1,8 @@
 import { ApiError, failure, json, readRequest } from "@/lib/api-security";
 import { sheets, validateLocation } from "@/lib/sheets";
 import { verifyTurnstile } from "@/lib/turnstile";
-import { bucketEnabled, replaceDocumento, uploadDocumento } from "@/lib/supabase";
+import { bucketEnabled, replaceDocumento, uploadDocumento, saveSubmissao, markSubmissaoGravada } from "@/lib/supabase";
+import { getDeadline, isExpired } from "@/lib/prazo";
 
 
 export const runtime = "nodejs";
@@ -72,6 +73,12 @@ function validCpf(value: unknown) {
 export async function POST(request: Request) {
   try {
     const { payload, arquivo } = await readPayload(request);
+
+    // Bloqueia envios quando o prazo de validação do formulário já encerrou.
+    const modoPrazo = payload.modalidade === "CP" ? "cp" : payload.modalidade === "SM" ? "sm" : null;
+    if (modoPrazo && isExpired(getDeadline(modoPrazo))) {
+      throw new ApiError(400, "Encerrou-se o prazo de validação.");
+    }
 
     // Le o anexo (multipart) ou aceita base64 ja codificado no JSON (integracoes e testes).
     let arquivoNome = "";
@@ -150,8 +157,25 @@ export async function POST(request: Request) {
         submission.arquivoBase64 = arquivoBase64;
       }
     }
-    await sheets({ ...submission, enviadoEm: new Date().toISOString() });
-    return json({ ok: true });
+    // Salva backup no Supabase antes de enviar para a planilha
+    const submissaoId = await saveSubmissao({
+      modalidade: String(payload.modalidade),
+      acao: String(payload.acao),
+      nte: String(payload.nte),
+      local: String(payload.local),
+      payload: submission,
+    });
+    
+    try {
+      await sheets({ ...submission, enviadoEm: new Date().toISOString() });
+      // Marca como gravada com sucesso
+      if (submissaoId) await markSubmissaoGravada(submissaoId, true);
+      return json({ ok: true });
+    } catch (error) {
+      // Marca como não gravada e registra o erro
+      if (submissaoId) await markSubmissaoGravada(submissaoId, false, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   } catch (error) {
     if (error instanceof Error && "detail" in error) console.error("SABE inscricoes erro:", error.message, "— detalhe:", (error as { detail?: string }).detail);
     else console.error("SABE inscricoes erro:", error);

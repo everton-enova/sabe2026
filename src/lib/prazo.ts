@@ -1,14 +1,12 @@
 /* Prazo de validação do formulário SABE 2026.
 
-   O CP foi reaberto excepcionalmente até 02/10/2026 às 23:59
+   Os dois formulários (CP e SM) foram encerrados em 02/10/2026 às 23:59
    (horário da Bahia). O prazo fica fixado no código para que configurações
-   antigas da hospedagem não impeçam a reabertura nem estendam o horário.
+   antigas da hospedagem não reabram os formulários nem estendam o horário.
 
-   Para os demais casos, sem a variável, o prazo é HOJE às 23:59 (Bahia).
-   Para definir um prazo exato — ou reabrir por um período — use:
-   - NEXT_PUBLIC_SABE_PRAZO_FIM=HOJE_2359                -> hoje às 23:59 (Bahia).
-   - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59:00-03:00 -> data/hora exata.
-   - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-09-29T23:59 (sem fuso) -> Bahia (-03:00).
+   Para reabrir um formulário por um período, use:
+   - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-10-10T23:59:00-03:00 -> data/hora exata.
+   - NEXT_PUBLIC_SABE_PRAZO_FIM=2026-10-10T23:59 (sem fuso) -> Bahia (-03:00).
 
    Cada formulário pode ter seu próprio prazo, sobrepondo o geral:
    - NEXT_PUBLIC_SABE_PRAZO_FIM_SM -> exclusivo do formulário SM.
@@ -19,7 +17,9 @@
 
 // Bahia = America/Bahia, UTC-3, sem horário de verão.
 const BAHIA_OFFSET_MS = -3 * 60 * 60 * 1000;
+// Encerramento definitivo dos dois formulários em 02/10/2026 às 23:59 (Bahia).
 const CP_DEADLINE_VIGENTE = "2026-10-02T23:59:00.000-03:00";
+const SM_DEADLINE_VIGENTE = "2026-10-02T23:59:00.000-03:00";
 
 function hojeAs2359(): Date {
   const bahiaAgora = new Date(Date.now() + BAHIA_OFFSET_MS);
@@ -60,10 +60,16 @@ export type PrazoMode = "cp" | "sm";
 export function getDeadline(mode?: PrazoMode): Date {
   const rawGeneral = String(process.env.NEXT_PUBLIC_SABE_PRAZO_FIM || "").trim();
 
-  // Reabertura excepcional do CP. Durante esta janela, a data fixa prevalece
-  // sobre variáveis antigas configuradas na hospedagem.
+  // Encerramento definitivo do CP. A data fixa prevalece sobre variáveis
+  // antigas configuradas na hospedagem.
   if (mode === "cp") {
     return new Date(CP_DEADLINE_VIGENTE);
+  }
+
+  // Encerramento definitivo do SM. A data fixa prevalece sobre variáveis
+  // antigas configuradas na hospedagem.
+  if (mode === "sm") {
+    return new Date(SM_DEADLINE_VIGENTE);
   }
 
   // Prazo específico do formulário tem prioridade sobre o prazo geral.
